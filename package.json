@@ -1,0 +1,22 @@
+{
+  "name": "qgen-pg",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "bin": "./bin/qgen-pg.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "pg": "^8.7.3"
+  },
+  "devDependencies": {
+    "@types/tap": "^15.0.7",
+    "rimraf": "^3.0.2",
+    "tap": "^16.2.0",
+    "typescript": "^4.7.2"
+  }
+}
