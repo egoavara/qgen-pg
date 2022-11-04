@@ -1,19 +1,36 @@
 {
-  "name": "qgen-pg",
+  "name": "qgen",
   "version": "0.0.0",
   "description": "",
-  "main": "index.js",
-  "bin": "./bin/qgen-pg.js",
+  "type": "module",
+  "bin": "./bin/qgen.js",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": {
+      "import": "./lib/index.js",
+      "types": "./types/index.d.ts"
+    }
+  },
+  "files": [
+    "./bin",
+    "./lib",
+    "./types"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "tsc",
+    "compile:watch": "tsc --watch"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "pg": "^8.7.3"
+    "glob": "^8.0.3",
+    "commander": "^9.4.1",
+    "pg": "^8.7.3",
+    "pito": "^1.1.0"
   },
   "devDependencies": {
+    "@types/pg": "^8.6.5",
     "@types/tap": "^15.0.7",
     "rimraf": "^3.0.2",
     "tap": "^16.2.0",
