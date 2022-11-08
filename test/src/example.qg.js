@@ -1,5 +1,7 @@
 import { qgen } from 'qgen'
-qgen('hello')
+
+qgen('ex')
     .query('select * from bzc.user_info where real_name = {{ realName }}')
-qgen('hello2')
-    .query(`select row('00', 10, null)::types.price from bzc.user_info`)
+
+qgen('ex2')
+    .query(`select * from bzc.buy_info`)

@@ -21,9 +21,11 @@ export interface PgTypeArray extends PgTypeCatalog {
 }
 export interface PgTypeClass extends PgTypeCatalog {
     type: 'class';
+    relkind: string;
+    orders: number[];
     fields: Record<string, PgType>;
 }
 export declare type PgType = PgTypePrimitive | PgTypeAlias | PgTypeArray | PgTypeClass;
 export declare function loadPgtypeAllOids(tx: BaseType, namespace: string, name: string): Promise<number[]>;
-export declare function loadPgtypeByName(tx: BaseType, namespace: string, name: string): Promise<PgType>;
-export declare function loadPgtypeByOid(tx: BaseType, oid: number): Promise<PgType>;
+export declare function loadPgtypeByName(tx: BaseType, namespace: string, name: string): Promise<PgType | undefined>;
+export declare function loadPgtypeByOid(tx: BaseType, oid: number): Promise<PgType | undefined>;

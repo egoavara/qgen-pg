@@ -17,14 +17,14 @@ export type QueryArgs<Q> =
 export class QgenBuilder<Query extends string = ''> {
     #name: string
     #query: string
-    #inputs: Record<string, { index: number, value: any, typeSnippet?: TsSnippet }>
-    private constructor(name: string, query: string, inputs: Record<string, { index: number, value: any, typeSnippet?: TsSnippet }>) {
+    #inputs: Record<string, { name: string, index: number, value: any, typeSnippet?: TsSnippet }>
+    private constructor(name: string) {
         this.#name = name
-        this.#query = query
-        this.#inputs = inputs
+        this.#query = ''
+        this.#inputs = {}
     }
     static create(name: string): QgenBuilder {
-        return new QgenBuilder(name, '', {})
+        return new QgenBuilder(name)
     }
     query<NewQuery extends string>(query: NewQuery): QgenBuilder<NewQuery> {
         let idx = 1;
@@ -36,9 +36,10 @@ export class QgenBuilder<Query extends string = ''> {
                 continue
             }
             this.#query += query.slice(qStartAt, field.index) + `$${idx}`
-            this.#inputs[field[1]] = { index: idx++, value: null }
+            this.#inputs[field[1]] = { name: field[1], index: idx++, value: null }
             qStartAt = field.index! + field[0].length
         }
+        this.#query += query.slice(qStartAt)
         return this as any
     }
     inputType(partitial: Partial<Record<QueryArgs<Query>, TsSnippet>>): QgenBuilder<Query> {
@@ -54,7 +55,6 @@ export class QgenBuilder<Query extends string = ''> {
         return this
     }
     end() {
-        
         return {
             name: this.#name,
             query: this.#query,
