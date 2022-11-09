@@ -1,7 +1,7 @@
 import { qgen } from 'qgen'
 
 qgen('hello')
-    .query('select * from bzc.user_info where real_name = {{ realName }}')
+    .query('select *, 4 from bzc.user_info where real_name = {{ realName }}')
 
-qgen('hello2')
-    .query(`select * from bzc.buy_info`)
+// qgen('hello2')
+//     .query(`select * from bzc.buy_info`)

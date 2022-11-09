@@ -1,25 +1,23 @@
 import ts from "typescript"
 
-export interface Query {
-    
+export interface StorageQuery {
     name: string
     text: string
     inputs: {
         key: string
-        type?: ts.TypeAliasDeclaration
+        type: ts.TransformerFactory<ts.TypeNode>
         value: any
     }[]
 }
-export namespace Query {
-    let secret: Query[] = []
-    export function add(q: Query) {
-        secret.push(q)
-    }
 
+export namespace StorageQuery {
+    let secret: StorageQuery[] = []
+    export function push(val: StorageQuery) {
+        secret.push(val)
+    }
     export function clear() {
         secret = []
     }
-
     export function copy() {
         return Array.from(secret)
     }

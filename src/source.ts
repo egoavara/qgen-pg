@@ -1,4 +1,5 @@
 
+
 export const QueryHeader = `// qgen query ...
 import type pg from 'pg';
 `
@@ -11,7 +12,24 @@ const builtinOids: number[] = Object.values(pg.types.builtins);
 export const LineSep = `// ===================================================================== //`
 export const DefaultUserBlockHint = `// 여기서 소스코드를 작성하세요...`
 export const HeaderEnd = `// 여기 아래부터는 자동 생성된 파서입니다. 건들지 마세요.`;
-
+import pg from "pg"
+export function te(re: pg.Pool, input: Record<string, any>): Promise<{ a: any, b: any, c: any }[]> {
+    return re.query({
+        rowMode: 'array',
+        name: '',
+        text: 'select a, b, c from hello where world = $1',
+        values: [input['world']],
+        // type
+    }).then(v => {
+        return v.rows.map(v => {
+            return {
+                a: v[0],
+                b: v[1],
+                c: v[2],
+            }
+        })
+    })
+}
 /**
  * 
  */

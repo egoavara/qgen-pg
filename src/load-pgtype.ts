@@ -23,18 +23,28 @@ export interface PgTypeArray extends PgTypeCatalog {
 export interface PgTypeClass extends PgTypeCatalog {
     type: 'class'
     relkind: string
-    orders: number[]
-    fields: Record<string, PgType>
+    orders: string[]
+    fields: Record<string, PgType & { notNull: boolean }>
 }
 export type PgType = PgTypePrimitive | PgTypeAlias | PgTypeArray | PgTypeClass;
 
-export async function loadPgtypeAllOids(tx: BaseType, namespace: string, name: string): Promise<number[]> {
+export async function loadPgtypeAllOids(tx: BaseType): Promise<number[]> {
     const temp = await tx.query(`
 select pt."oid" as "oid" from pg_catalog.pg_type pt
 order by coalesce(nullif(pt.typelem, 0), nullif(pt.typrelid, 0), nullif(pt.typbasetype, 0), pt."oid"), pt."oid"
 `)
     return temp.rows.map((v) => v.oid)
 }
+
+
+export async function loadPgtableAllPgtypeOids(tx: BaseType): Promise<{ pgTypeOid: number, pgTableOid: number }[]> {
+    const temp = await tx.query(`
+select pt."oid" as "pgTypeOid", pc."oid" as "pgTableOid" from pg_catalog.pg_class pc
+inner join pg_catalog.pg_type pt on pt.typrelid = pc."oid"    
+`)
+    return temp.rows
+}
+
 export async function loadPgtypeByName(tx: BaseType, namespace: string, name: string): Promise<PgType | undefined> {
     const temp = await tx.query(`select pt."oid" as "oid" from pg_catalog.pg_type pt inner join pg_catalog.pg_namespace pn on pn."oid" = pt.typnamespace where pn.nspname = $1 and pt.typname =$2`, [namespace, name])
     if (temp.rowCount !== 1) {
@@ -94,13 +104,12 @@ where pt."oid" = $1
     }
     if (temp.rows[0].typrelid !== 0) {
         const rawFields = await tx.query(`
-select (select json_object_agg(pa.attname, pa.atttypid::int)from pg_catalog.pg_attribute pa where pa.attnum > 0 and pa.attrelid  = pc."oid"	) as "fields"
-from pg_catalog.pg_class pc
+select pa.attname as "attname", pa.atttypid as "atttypid"
+from pg_catalog.pg_attribute pa
+inner join pg_catalog.pg_class pc on pc."oid" = pa.attrelid
 inner join pg_catalog.pg_type pt on pt."oid" = pc.reltype
-where pc."oid" = $1`, [temp.rows[0].typrelid]);
-        if (rawFields.rowCount !== 1) {
-            return undefined
-        }
+where pa.attnum > 0 and pc."oid" = $1
+        `, [temp.rows[0].typrelid]);
         const rawFieldsOrder = await tx.query(`
         select attname as "fieldname"
         from pg_catalog.pg_attribute pa
@@ -112,9 +121,30 @@ select pc.relkind as "relkind"
 from pg_catalog.pg_class pc
 inner join pg_catalog.pg_type pt on pt."oid" = pc.reltype
 where pc."oid" = $1`, [temp.rows[0].typrelid]);
-        if (rawPgclass.rowCount !== 1) {
-            return undefined
-        }
+        //
+        const rawFieldsNullCheck = rawPgclass.rows[0].relkind === 'v'
+            // postgres는 view의 모든 필드를 nullable 추론하기에 원본 테이블 레퍼런스로 찾아가 이 필드가 null인지 체크하는 과정이 필요하다.
+            ? await tx.query(`
+select vcu.column_name as "columnName", c.is_nullable = 'NO' as "isNullable"
+from information_schema.view_column_usage vcu 
+join information_schema."columns" c 
+    on c.column_name = vcu.column_name 
+    and c.table_name  = vcu.table_name 
+    and c.table_schema  = vcu.table_schema 
+    and c.table_catalog = vcu.table_catalog 
+where 
+    view_schema = all(select pn.nspname from pg_catalog.pg_namespace pn inner join pg_catalog.pg_class pc on pc.relnamespace = pn."oid"  where pc."oid" = $1)
+    and view_name = all(select pc.relname from pg_catalog.pg_class pc where pc."oid" = $1)
+                    `, [temp.rows[0].typrelid])
+            // postgres view가 아니라면 레퍼런스가 없으므로 아래와 같이 사용해야 한다.
+            : await tx.query(`
+select pa.attname as "columnName", pa.attnotnull as "isNullable"
+from pg_catalog.pg_attribute pa
+inner join pg_catalog.pg_class pc on pc."oid" = pa.attrelid
+inner join pg_catalog.pg_type pt on pt."oid" = pc.reltype
+where pa.attnum > 0 and pc."oid" = $1
+                                `, [temp.rows[0].typrelid])
+        const nullableFields: Record<string, boolean> = Object.fromEntries(rawFieldsNullCheck.rows.map(v => [v.columnName, v.isNullable]))
         return {
             oid: temp.rows[0].oid,
             namespace: temp.rows[0].namespace,
@@ -125,12 +155,15 @@ where pc."oid" = $1`, [temp.rows[0].typrelid]);
             type: 'class',
             relkind: rawPgclass.rows[0].relkind,
             orders: rawFieldsOrder.rows.map(v => v.fieldname),
-            fields: Object.fromEntries(await Promise.all(Object.entries(rawFields.rows[0].fields).map(async ([k, v]) => {
-                const pgtype = await loadPgtypeByOid(tx, v as any)
+            fields: Object.fromEntries(await Promise.all(rawFields.rows.map(async ({ attname, atttypid }) => {
+                const pgtype = await loadPgtypeByOid(tx, atttypid)
                 if (pgtype === undefined) {
-                    throw new Error(`${temp.rows[0].namespace}.${temp.rows[0].name} class의 요소 ${k} 타입을 찾을 수 없습니다.`)
+                    throw new Error(`${temp.rows[0].namespace}.${temp.rows[0].name} class의 요소 ${attname}의 타입(${atttypid})을 찾을 수 없습니다.`)
                 }
-                return [k, pgtype]
+                return [attname, {
+                    ...pgtype,
+                    notNull: nullableFields[attname]
+                }]
             })))
         }
     }

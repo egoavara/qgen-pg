@@ -97,7 +97,6 @@ const testResult = await Promise.all(srcs.map(async ({ src, rel, dst, defines })
                 text: query,
                 values: testValues,
             }))
-            console.log(`${rel.padEnd(20)} > name : ${name.padEnd(16)}, ${query}`)
             return {
                 fields: check.fields,
                 name,
