@@ -1,9 +1,18 @@
 import ts from "typescript";
 import { PgType } from "./load-pgtype.js";
-import { CopiedStorageType } from "./storage-type.js";
+import { StorageType } from "./storage-type.js";
 
-
-export function pgToTs(pgtype: PgType | undefined, notNull: boolean | undefined, option: { pgNullToTs: 'null' | 'undefined', mapping: CopiedStorageType }): (context: ts.TransformationContext) => ts.TypeNode {
+export function pgToTsTuple(pgtype: [PgType, boolean][], option: { pgNullToTs: 'null' | 'undefined', mapping: Record<number, StorageType> }): (context: ts.TransformationContext) => ts.TypeNode {
+    return (ctx) => {
+        if (pgtype.length == 1) {
+            return pgToTs(pgtype[0][0], pgtype[0][1], option)(ctx)
+        }
+        return ctx.factory.createTupleTypeNode(pgtype.map(([tp, nn]) => {
+            return pgToTs(tp, nn, option)(ctx)
+        }))
+    }
+}
+export function pgToTs(pgtype: PgType | undefined, notNull: boolean | undefined, option: { pgNullToTs: 'null' | 'undefined', mapping: Record<number, StorageType> }): (context: ts.TransformationContext) => ts.TypeNode {
     if (pgtype === undefined) {
         return ({ factory }) => factory.createToken(ts.SyntaxKind.AnyKeyword)
     }
@@ -48,10 +57,10 @@ export function pgToTs(pgtype: PgType | undefined, notNull: boolean | undefined,
                 )
             })
         case 'primitive':
-            const generator =
-                option.mapping.name[pgtype.namespace]?.[pgtype.name]?.type
-                ?? option.mapping.oid[pgtype.oid]?.type
-                ?? ((ctx: ts.TransformationContext) => ctx.factory.createToken(ts.SyntaxKind.AnyKeyword))
+            const generator = (ctx: ts.TransformationContext) => {
+                return option.mapping[pgtype.oid]?.type
+                    ?? ctx.factory.createToken(ts.SyntaxKind.AnyKeyword)
+            }
             return modifier(generator)
     }
 

@@ -1,19 +1,18 @@
 #!/usr/bin/env node
-const { Program } = require("../lib/index.js");
+const { Program } = require("../lib/program.js");
 const program = new Program({
+    entrypoint : 'src/qgen.ep.ts',
     pgPassword: 'test'
 });
 (async () => {
-    console.log("q", await program.sources())
     const [
-        runSource,
         pgTypes,
         pgTables,
     ] = await Promise.all([
-        program.runSource(),
         program.runPgType(),
         program.runPgTable(),
     ])
+    const runSource = await program.runSource(pgTypes)
     const runQuery = await program.runQuery(pgTypes, pgTables, runSource)
     const runBuild = await program.runBuild(runQuery, runSource)
     for (const [path, text] of Object.entries(runBuild)) {
@@ -27,12 +26,10 @@ const program = new Program({
 })();
 // const ts = require('typescript');
 // const src = ts.createSourceFile("./test.ts", `
-// export type foo = { "?hello?" : null, b : 'world'}
+// type D = typeof import("qgen")
 // `, ts.ScriptTarget.ESNext)
 // const printer = ts.createPrinter({})
 
-// // ts.parseJsonConfigFileContent()
-// // host.writeFile()
 // const result = ts.transform(src, [
 //     (ctx) => {
 //         const { factory } = ctx
@@ -40,7 +37,7 @@ const program = new Program({
 //             if (!ts.isSourceFile(node)) {
 //                 throw new Error("unreachable")
 //             }
-//             console.log(node.statements[0].type.members[0])
+//             console.log(node.statements[0].type)
 //             ts.SyntaxKind
 //             return factory.updateSourceFile(
 //                 node,

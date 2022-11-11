@@ -1,38 +1,9 @@
 
 
-export const QueryHeader = `// qgen query ...
+export const QueryHeader = (ep: string) => `// qgen query ...
 import type pg from 'pg';
+import _QGEN_EP from ${JSON.stringify(ep)}
 `
-export const HeaderStart = `// qgen type ...
-import pg from 'pg';
-const builtinOids: number[] = Object.values(pg.types.builtins);
-
-// 사용자 입력은 반드시 아래의 블럭 사이에서만 작성해야 합니다.
-// 그 외의 영역에서 작성된 소스코드는 모두 삭제됩니다.`;
-export const LineSep = `// ===================================================================== //`
-export const DefaultUserBlockHint = `// 여기서 소스코드를 작성하세요...`
-export const HeaderEnd = `// 여기 아래부터는 자동 생성된 파서입니다. 건들지 마세요.`;
-import pg from "pg"
-export function te(re: pg.Pool, input: Record<string, any>): Promise<{ a: any, b: any, c: any }[]> {
-    return re.query({
-        rowMode: 'array',
-        name: '',
-        text: 'select a, b, c from hello where world = $1',
-        values: [input['world']],
-        // type
-    }).then(v => {
-        return v.rows.map(v => {
-            return {
-                a: v[0],
-                b: v[1],
-                c: v[2],
-            }
-        })
-    })
-}
-/**
- * 
- */
 export const ArrayParser = `
 /**
  * Thanks to bendrucker
@@ -221,3 +192,16 @@ class ClassParser {
     }
 }
 `
+// import pg from 'pg';
+// const clt = new pg.Client()
+// clt.query({
+//     rowMode: 'array',
+//     text: '',
+//     types
+// })
+// export const TypeParser = {
+//     parser: {} as Record<number, >,
+//     getTypeParser(oid, format) {
+
+//     }
+// } as pg.CustomTypesConfig

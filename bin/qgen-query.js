@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { program } from 'commander'
+import fs from 'fs/promises'
 import glob from 'glob'
 import path from 'path'
 import pg from 'pg'
-import fs from 'fs/promises'
 import { clearDefine, getDefine, getTypedef, isExistTypedef, loadPgtypeAllOids, loadPgtypeByOid, QueryHeader, setTypedef, snakeToCamel, totalTypedef } from '../lib/index.js'
 
 // ============================================================================

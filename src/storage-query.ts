@@ -5,7 +5,7 @@ export interface StorageQuery {
     text: string
     inputs: {
         key: string
-        type: ts.TransformerFactory<ts.TypeNode>
+        type: ts.TypeNode
         value: any
     }[]
 }
