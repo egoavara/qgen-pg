@@ -51,7 +51,7 @@ export class Program {
         this.option = {
             cwd: (option.cwd ?? process.cwd()).split(path.win32.sep).join(path.posix.sep),
             input: option.input ?? ["./**/*.qg.ts", "./**/*.qg.js"],
-            output: option.output ?? "./query",
+            output: option.output ?? ".",
             base: option.base ?? ".",
             entrypoint: option.entrypoint ?? "./qgen.ep.ts",
             tsconfig: option.tsconfig ?? "./tsconfig.json",

@@ -1,6 +1,6 @@
 import ts from "typescript";
 import pg from "pg";
-import { QueryArgs, StorageQuery } from "./index.js";
+import { AssignDepth2, QueryArgs, StorageQuery } from "./index.js";
 const RE_NAMED_ARGS = /\{\{\s*([a-zA-Z_-][a-zA-Z0-9_-]*)\s*\}\}/g
 export class QueryBuilder {
     name: string
@@ -52,13 +52,87 @@ export class TypeBuilder<Type> implements pg.CustomTypesConfig {
     #mapping: Record<number, [string, string]>
     #parser: Record<string, Record<string, (raw: string) => any>>
     constructor(mapping: Record<number, [string, string]>, parser: Record<string, Record<string, (raw: string) => any>>) {
-        this.#mapping = {}
-        this.#parser = {}
+        this.#mapping = mapping
+        this.#parser = parser
     }
-    addOid(oid: number, namespace: string, name: string) {
-        this.#mapping[oid] = [namespace, name]
+    // oid, namespace, name, parser
+    setup(set: [number, string, string, (raw: string) => any][]) {
+        for (const [oid, ns, nm, parser] of set) {
+            this.#mapping[oid] = [ns, nm]
+            if (!(ns in this.#parser)) {
+                this.#parser[ns] = {}
+            }
+            this.#parser[ns][nm] = parser
+        }
     }
-    type<NS extends string, NM extends string, T>(namespace: NS, name: NM, parser: (raw: string) => T, oid?: number): TypeBuilder<Type & Record<NS, Record<NM, T>>> {
+    use(ext: "bigint"): TypeBuilder<AssignDepth2<Record<'pg_catalog', pg_catalog_ext['bigint']>, Type>>;
+    use(ext: "bitnumber.js"): TypeBuilder<AssignDepth2<Record<'pg_catalog', pg_catalog_ext['bitnumber.js']>, Type>>;
+    use(ext: "moment"): TypeBuilder<AssignDepth2<Record<'pg_catalog', pg_catalog_ext['moment']>, Type>>;
+    use(ext: string, ...args: any[]): any {
+        switch (ext) {
+            case "bigint":
+                this.#parser['pg_catalog']['int8'] = (raw: string) => { return BigInt(raw) }
+                return this
+            case "bitnumber.js":
+                import('bignumber.js').then(bn => {
+                    this.#parser['pg_catalog']['numeric'] = (raw: string) => {
+                        return bn.BigNumber(raw)
+                    }
+                }).catch(() => {
+                    console.error(`must install 'bignumber.js' for your package
+npm  : npm i bignumber.js
+yarn : yarn add bignumber.js
+pnpm : pnpm add bignumber.js
+                    `)
+                    process.exit(1)
+                })
+                return this
+            case "moment":
+                // "date": import("moment").Moment,
+                // "time": import("moment").Moment,
+                // "timestamp": import("moment").Moment,
+                // "timestamptz": import("moment").Moment,
+                // "timetz": import("moment").Moment,
+                // "interval": import("moment").Duration,
+                import('moment').then(moment => {
+                    
+                    this.#parser['pg_catalog']['date'] = (raw: string) => {
+                        return moment.default(raw, "YYYY-MM-DD")
+                    }
+                    this.#mapping[pg.types.builtins.TIME] = ['pg_catalog', 'time']
+                    this.#parser['pg_catalog']['time'] = (raw: string) => {
+                        return moment.default(raw, "hh:mm:ss")
+                    }
+                }).catch(() => {
+                    console.error(`must install 'moment' for your package
+    npm  : npm i moment
+    yarn : yarn add moment
+    pnpm : pnpm add moment
+                        `)
+                    process.exit(1)
+                })
+                return this
+            default:
+                throw Error(`unknown extension ${ext}`)
+        }
+    }
+    find(type: 'oid', namespace: string, name: string): number | undefined {
+        const temp = Object.entries(this.#mapping).find(([k, [ns, nm]]) => {
+            if (ns === namespace && nm === name) {
+                return true
+            }
+            return false
+        })
+        if (temp === undefined) {
+            return undefined
+        }
+        return Number(temp[0])
+    }
+
+    type<NS extends keyof Type, NM extends keyof Type[NS], T>(namespace: NS, name: NM, parser: (raw: string) => T, oid?: number): TypeBuilder<Omit<Type, NS> & Record<NS, Omit<Type[NS], NM>> & Record<NS, Record<NM, T>>>;
+    type<NS extends keyof Type, NM extends string, T>(namespace: NS, name: NM, parser: (raw: string) => T, oid?: number): TypeBuilder<Type & Record<NS, Record<NM, T>>>;
+    type<NS extends string, NM extends string, T>(namespace: NS, name: NM, parser: (raw: string) => T, oid?: number): TypeBuilder<Type & Record<NS, Record<NM, T>>>;
+    type<NS extends string, NM extends string, T>(namespace: NS, name: NM, parser: (raw: string) => T, oid?: number): TypeBuilder<Omit<Type, NS> & Record<NS, Record<NM, T>>> {
         if (oid !== undefined) {
             this.#mapping[oid] = [namespace, name]
         }
@@ -66,13 +140,13 @@ export class TypeBuilder<Type> implements pg.CustomTypesConfig {
             this.#parser[namespace] = {}
         }
         this.#parser[namespace][name] = parser
-        return this
+        return this as any
     }
     getTypeParser(id: number, format?: any): any {
         if (format === 'binary') {
             throw new Error(`binary not support`)
         }
-        if (id in format) {
+        if (id in this.#mapping) {
             const [ns, nm] = this.#mapping[id]
             return this.#parser[ns]?.[nm] ?? pg.types.getTypeParser(id, format)
         }
@@ -81,7 +155,7 @@ export class TypeBuilder<Type> implements pg.CustomTypesConfig {
 
 
 }
-export interface pg_catalog {
+export type pg_catalog = {
     bool: boolean
     char: string
     int8: string
@@ -101,8 +175,22 @@ export interface pg_catalog {
     numeric: string
     uuid: string
     jsonb: any
-    // 
-    [x: string]: any
+}
+export type pg_catalog_ext = {
+    "bigint": {
+        int8: bigint
+    },
+    "bitnumber.js": {
+        numeric: import('bignumber.js').BigNumber
+    },
+    "moment": {
+        "date": import("moment").Moment,
+        "time": import("moment").Moment,
+        "timestamp": import("moment").Moment,
+        "timestamptz": import("moment").Moment,
+        "timetz": import("moment").Moment,
+        "interval": import("moment").Duration,
+    }
 }
 export function qgen(name: string): QueryBuilder;
 export function qgen(): TypeBuilder<{ pg_catalog: pg_catalog }>;
@@ -157,8 +245,8 @@ export type QgenTypeParser<T, NS, NM> = T extends TypeBuilder<infer Parser>
         ? (
             NM extends keyof Parser[NS]
             ? Parser[NS][NM]
-            : unknown
+            : any
         )
-        : unknown
+        : any
     )
     : unknown

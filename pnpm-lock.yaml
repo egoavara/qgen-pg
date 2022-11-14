@@ -4,8 +4,11 @@ specifiers:
   '@types/node': ^18.11.9
   '@types/pg': ^8.6.5
   '@types/tap': ^15.0.7
+  bignumber.js: ^9.0.0
   commander: ^9.4.1
+  currency.js: ^2.0.0
   glob: ^8.0.3
+  moment: ^2.0.0
   pg: ^8.7.3
   rimraf: ^3.0.2
   tap: ^16.2.0
@@ -20,7 +23,11 @@ dependencies:
   glob: 8.0.3
   pg: 8.7.3
   tst-reflect: 0.12.0
-  typescript: 4.7.2
+
+optionalDependencies:
+  bignumber.js: 9.1.0
+  currency.js: 2.0.4
+  moment: 2.29.4
 
 devDependencies:
   '@types/node': 18.11.9
@@ -31,6 +38,7 @@ devDependencies:
   ts-node: 10.9.1_fihfpqnsdi7uebbckyte57bzgm
   tst-reflect-transformer: 0.12.5
   ttypescript: 1.5.13_tm7t24yt7c2uupjo3heh6vqete
+  typescript: 4.7.2
 
 packages:
 
@@ -411,6 +419,12 @@ packages:
   /balanced-match/1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
 
+  /bignumber.js/9.1.0:
+    resolution: {integrity: sha512-4LwHK4nfDOraBCtst+wOWIHbu1vhvAPJK8g8nROd4iuc3PSEjWif/qwbkh8jwCJz6yDBvtU4KPynETgrfh7y3A==}
+    requiresBuild: true
+    dev: false
+    optional: true
+
   /binary-extensions/2.2.0:
     resolution: {integrity: sha512-jDctJ/IVQbZoJykoeHbhXpOlNBqGNcwXJKJog42E5HDPUwQTSdjCHdihjj0DlnheQ7blbT6dHOafNAiS8ooQKA==}
     engines: {node: '>=8'}
@@ -583,6 +597,13 @@ packages:
       shebang-command: 2.0.0
       which: 2.0.2
     dev: true
+
+  /currency.js/2.0.4:
+    resolution: {integrity: sha512-6/OplJYgJ0RUlli74d93HJ/OsKVBi8lB1+Z6eJYS1YZzBuIp4qKKHpJ7ad+GvTlWmLR/hLJOWTykN5Nm8NJ7+w==}
+    engines: {node: '>=4'}
+    requiresBuild: true
+    dev: false
+    optional: true
 
   /debug/4.3.4:
     resolution: {integrity: sha512-PRWFHuSU3eDtQJPvnNY7Jcket1j0t5OuOsFzPPzsekD52Zl8qUfFIPEiswXqIvHWGVHOgX+7G/vCNNhehwxfkQ==}
@@ -1029,6 +1050,12 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
     dev: true
+
+  /moment/2.29.4:
+    resolution: {integrity: sha512-5LC9SOxjSc2HF6vO2CyuTDNivEdoz2IvyJJGj6X8DJ0eFyfszE0QiEd+iXmBvUP3WHxSjFH/vIsA0EN00cgr8w==}
+    requiresBuild: true
+    dev: false
+    optional: true
 
   /ms/2.1.2:
     resolution: {integrity: sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==}
@@ -1609,6 +1636,7 @@ packages:
     resolution: {integrity: sha512-Mamb1iX2FDUpcTRzltPxgWMKy3fhg0TN378ylbktPGPK/99KbDtMQ4W1hwgsbPAsG3a0xKa1vmw4VKZQbkvz5A==}
     engines: {node: '>=4.2.0'}
     hasBin: true
+    dev: true
 
   /unicode-length/2.0.2:
     resolution: {integrity: sha512-Ph/j1VbS3/r77nhoY2WU0GWGjVYOHL3xpKp0y/Eq2e5r0mT/6b649vm7KFO6RdAdrZkYLdxphYVgvODxPB+Ebg==}

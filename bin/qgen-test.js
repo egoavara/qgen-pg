@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 const { Program } = require("../lib/program.js");
+const fsp = require("fs/promises");
+const path = require("path");
 const program = new Program({
-    entrypoint : 'src/qgen.ep.ts',
+    entrypoint: 'src/qgen.ep.ts',
+    output: './src',
     pgPassword: 'test'
 });
 (async () => {
@@ -15,13 +18,11 @@ const program = new Program({
     const runSource = await program.runSource(pgTypes)
     const runQuery = await program.runQuery(pgTypes, pgTables, runSource)
     const runBuild = await program.runBuild(runQuery, runSource)
-    for (const [path, text] of Object.entries(runBuild)) {
-
-        console.log("============================================")
-        console.log(`: ${path}`)
-        console.log(text)
-        console.log()
-    }
+    await Promise.all(Object.entries(runBuild).map(async ([filepath, text]) => {
+        console.log(filepath)
+        await fsp.mkdir(path.dirname(filepath), { recursive: true })
+        await fsp.writeFile(filepath, text)
+    }))
     program.exit()
 })();
 // const ts = require('typescript');
