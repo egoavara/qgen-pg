@@ -1,5 +1,10 @@
 {
-    "explorer.autoReveal": false,
-    "typescript.preferences.importModuleSpecifierEnding": "js",
-    "typescript.tsdk": "node_modules\\typescript\\lib"
+  "explorer.autoReveal": false,
+  "typescript.preferences.importModuleSpecifierEnding": "js",
+  "typescript.tsdk": ".yarn/sdks/typescript/lib",
+  "search.exclude": {
+    "**/.yarn": true,
+    "**/.pnp.*": true
+  },
+  "typescript.enablePromptUseWorkspaceTsdk": true
 }

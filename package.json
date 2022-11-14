@@ -1,25 +1,28 @@
 {
   "name": "qgen",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "",
   "bin": "./bin/qgen.js",
   "main": "./lib/index.js",
   "types": "./types/index.d.ts",
   "exports": {
     ".": {
-      "require": "./lib/index.js",
-      "import": "./lib/index.js",
+      "require": "./cjs/index.js",
+      "import": "./esm/index.js",
       "types": "./types/index.d.ts"
     }
   },
   "files": [
     "./bin",
-    "./lib",
-    "./types"
+    "cjs/**/*.js",
+    "cjs/package.json",
+    "esm/**/*.js",
+    "esm/package.json",
+    "types/**/*.d.ts"
   ],
   "scripts": {
-    "compile": "tsc",
-    "compile:watch": "tsc --watch"
+    "compile": "tsc -b ./cjs/tsconfig.json ./esm/tsconfig.json ./types/tsconfig.json",
+    "compile:watch": "tsc -b ./cjs/tsconfig.json ./esm/tsconfig.json ./types/tsconfig.json --watch"
   },
   "keywords": [],
   "author": "",
@@ -27,8 +30,7 @@
   "dependencies": {
     "commander": "^9.4.1",
     "glob": "^8.0.3",
-    "pg": "^8.7.3",
-    "tst-reflect": "^0.12.0"
+    "pg": "^8.7.3"
   },
   "devDependencies": {
     "@types/node": "^18.11.9",
@@ -37,8 +39,6 @@
     "rimraf": "^3.0.2",
     "tap": "^16.2.0",
     "ts-node": "^10.9.1",
-    "tst-reflect-transformer": "^0.12.5",
-    "ttypescript": "^1.5.13",
     "typescript": "^4.7.2"
   },
   "peerDependencies": {
@@ -46,7 +46,8 @@
   },
   "optionalDependencies": {
     "bignumber.js": "^9.0.0",
-    "moment": "^2.0.0",
-    "currency.js": "^2.0.0"
-  }
+    "currency.js": "^2.0.0",
+    "moment": "^2.0.0"
+  },
+  "packageManager": "yarn@3.2.4"
 }

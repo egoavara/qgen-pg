@@ -120,14 +120,22 @@ dist
 .vscode-test
 
 # yarn v2
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
 .pnp.*
 
 
 types/**/*
-lib/**/*
+!types/tsconfig.json
+!types/package.json
+
+cjs/**/*
+!cjs/tsconfig.json
+!cjs/package.json
+
+esm/**/*
+!esm/tsconfig.json
+!esm/package.json
 
 !.gitkeep
