@@ -1,4 +1,4 @@
-import { pg_catalog } from "./interface-pg_catalog.js"
+import { pg_catalog } from "./pg-builtins-types.js"
 import { PgCatalogOid, PgCatalogParser } from "./pg-builtins.js"
 import { QueryBuilder } from "./syntax-querybuilder.js"
 import { TypeBuilder } from "./syntax-typebuilder.js"

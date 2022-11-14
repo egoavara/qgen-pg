@@ -1,6 +1,6 @@
 
 export * from './utils.js'
-export * from './interface-pg_catalog.js'
+export * from './pg-builtins.js'
 export * from './pg-builtins-types.js'
 export * from './parser-array.js'
 export * from './parser-composite.js'
