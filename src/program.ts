@@ -3,10 +3,11 @@ import pg from "pg"
 import ts from "typescript"
 import vm from "vm"
 import { loadPgtableAllPgtypeOids, loadPgtypeAllOids, loadPgtypeByOid, PgType, PgTypeClass } from "./load-pgtype.js"
+import { defaultDefines, PgToTsConfig } from "./pg-to-ts.js"
 import { eachQuery } from "./source-eachquery.js"
+import { createEntrypointSource } from "./source-entrypoint.js"
 import { QueryHeader } from "./source.js"
 import { StorageQuery } from "./storage-query.js"
-import { StorageType } from "./storage-type.js"
 import { snakeToCamel } from "./utils.js"
 
 export interface ProgramOption {
@@ -21,6 +22,7 @@ export interface ProgramOption {
     pgUsername?: string
     pgPassword?: string | null
     pgDatabase?: string
+    config?: Partial<Omit<PgToTsConfig, "mapping" | "define">>
 }
 
 export type RunPgTypeOutput = Record<number, PgType>
@@ -41,9 +43,6 @@ export interface RunEachQueryOutput extends StorageQuery {
     name: string
     fields: RunEachQueryField[]
 }
-export interface RunEachTypeOutput extends StorageType {
-    name: string
-}
 export class Program {
     option: Required<ProgramOption>
     program: ts.Program
@@ -61,6 +60,7 @@ export class Program {
             pgUsername: option.pgUsername ?? "postgres",
             pgPassword: option.pgPassword ?? null,
             pgDatabase: option.pgDatabase ?? "postgres",
+            config: option.config ?? {}
         }
 
         const configPath = ts.findConfigFile(this.option.cwd, ts.sys.fileExists, this.option.tsconfig)
@@ -96,9 +96,6 @@ export class Program {
     sources(): string[] {
         return this.program.getSourceFiles().map(v => v.fileName).filter(v => v.endsWith(".qg.ts") || v.endsWith(".qg.js"));
     }
-    entrypoint(): string {
-        return this.program.getSourceFiles().map(v => v.fileName).filter(v => v.endsWith(".ep.ts"))[0];
-    }
     async runSource(types: RunPgTypeOutput, sources?: string[]): Promise<RunSourceOutput> {
         const qgenNameToOid: Record<string, Record<string, number>> = {}
         for (const pgtyp of Object.values(types)) {
@@ -126,9 +123,6 @@ export class Program {
                     tssrc,
                     (filename, jssrc) => {
                         if (filename.endsWith(".js")) {
-                            // console.log('=========')
-                            // console.log(filename)
-                            // console.log(jssrc)
                             resolve(jssrc)
                         }
                     },
@@ -212,18 +206,27 @@ export class Program {
         }))
         return Object.fromEntries(temp)
     }
-    async runBuild(queryResult: RunQueryOutput, sourceResult: RunSourceOutput): Promise<Record<string, string>> {
+    async runBuild(queryResult: RunQueryOutput, typesOutput: RunPgTypeOutput): Promise<Record<string, string>> {
+
+        const option: PgToTsConfig = {
+            tsNullType: this.option.config.tsNullType ?? "null",
+            unsafeArray : this.option.config.unsafeArray ?? false,
+            extension : this.option.config.extension ?? [],
+            mapping: typesOutput,
+            define: Object.create(defaultDefines),
+        }
+        //
         const printer = ts.createPrinter()
         const abscwd = path.posix.normalize(path.posix.join(this.option.cwd, this.option.base))
-        const ep = path.posix.relative(path.posix.normalize(this.option.cwd), this.entrypoint()).replace(".ep.ts", ".ep.js")
-        // 
+        const entrypoint = path.posix.join(path.posix.normalize(path.posix.join(this.option.cwd, this.option.output)), this.option.entrypoint)
+        const entrypointjs = path.posix.relative(this.option.cwd, entrypoint.replace(".ep.ts", ".ep.js"))
         const sources = Object.fromEntries(await Promise.all(Object.entries(queryResult).map<Promise<[string, string]>>(async ([filename, output]) => {
             let outputFileName = path.posix.join(this.option.output, path.posix.relative(abscwd, path.posix.normalize(filename)),).replace(".qg.ts", ".qgout.ts")
             const originSrc = this.program.getSourceFile(filename)
             if (originSrc === undefined) {
                 throw Error(`${filename} not exist`)
             }
-            const tempep = path.posix.relative(path.posix.dirname(outputFileName), ep)
+            const tempep = path.posix.relative(path.posix.dirname(outputFileName), entrypointjs)
             const relep = tempep.startsWith(".") ? tempep : "./" + tempep
             // output
             const tsrc = ts.transform(
@@ -251,6 +254,7 @@ export class Program {
                 printer.printFile(tsrc),
             ]
         })))
+        sources[path.posix.relative(this.option.cwd, entrypoint)] = printer.printFile(createEntrypointSource(this.option.entrypoint, typesOutput, option))
         // 
         return sources
     }

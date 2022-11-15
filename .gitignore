@@ -139,3 +139,5 @@ esm/**/*
 !esm/package.json
 
 !.gitkeep
+
+test/lib

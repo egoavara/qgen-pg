@@ -6,7 +6,7 @@ import { CompositeParser } from "./parser-composite.js"
  * inner join pg_namespace pn on pn.oid = pt.typnamespace
  * where pn.nspname = 'pg_catalog';
  */
-const builtins = {
+export const pgBuiltins = {
     "any": 2276,
     "bit": 1560,
     "box": 603,
@@ -460,54 +460,4 @@ const builtins = {
     "_pg_stat_progress_create_index": 12522,
     "pg_available_extension_versions": 12304,
     "_pg_available_extension_versions": 12303
-}
-const parseFloat8 = pg.types.getTypeParser(builtins.float8, 'text')
-
-export const PgCatalogOid: Record<number, [string, string]> = Object.fromEntries(Object.entries(builtins).map(([k, v]) => {
-    return [String(v), ['pg_catalog', k]]
-}))
-
-export const PgCatalogParser: Record<string, Record<string, (raw: string) => any>> = {
-    'pg_catalog': {
-        'bool': pg.types.getTypeParser(builtins.bool, 'text'),
-        '_bool': ArrayParser.create(pg.types.getTypeParser(builtins.bool, 'text')),
-        'char': pg.types.getTypeParser(builtins.char, 'text'),
-        '_char': ArrayParser.create(pg.types.getTypeParser(builtins.char, 'text')),
-        'int8': pg.types.getTypeParser(builtins.int8, 'text'),
-        '_int8': ArrayParser.create(pg.types.getTypeParser(builtins.int8, 'text')),
-        'int2': pg.types.getTypeParser(builtins.int2, 'text'),
-        '_int2': ArrayParser.create(pg.types.getTypeParser(builtins.int2, 'text')),
-        'int4': pg.types.getTypeParser(builtins.int4, 'text'),
-        '_int4': ArrayParser.create(pg.types.getTypeParser(builtins.int4, 'text')),
-        'text': pg.types.getTypeParser(builtins.text, 'text'),
-        '_text': ArrayParser.create(pg.types.getTypeParser(builtins.text, 'text')),
-        'json': pg.types.getTypeParser(builtins.json, 'text'),
-        '_json': ArrayParser.create(pg.types.getTypeParser(builtins.json, 'text')),
-        'xml': pg.types.getTypeParser(builtins.xml, 'text'),
-        '_xml': ArrayParser.create(pg.types.getTypeParser(builtins.xml, 'text')),
-        'float4': pg.types.getTypeParser(builtins.float4, 'text'),
-        '_float4': ArrayParser.create(pg.types.getTypeParser(builtins.float4, 'text')),
-        'float8': pg.types.getTypeParser(builtins.float8, 'text'),
-        '_float8': ArrayParser.create(pg.types.getTypeParser(builtins.float8, 'text')),
-        'bpchar': pg.types.getTypeParser(builtins.bpchar, 'text'),
-        '_bpchar': ArrayParser.create(pg.types.getTypeParser(builtins.bpchar, 'text')),
-        'varchar': pg.types.getTypeParser(builtins.varchar, 'text'),
-        '_varchar': ArrayParser.create(pg.types.getTypeParser(builtins.varchar, 'text')),
-        'date': pg.types.getTypeParser(builtins.date, 'text'),
-        '_date': ArrayParser.create(pg.types.getTypeParser(builtins.date, 'text')),
-        'timestamp': pg.types.getTypeParser(builtins.timestamp, 'text'),
-        '_timestamp': ArrayParser.create(pg.types.getTypeParser(builtins.timestamp, 'text')),
-        'timestamptz': pg.types.getTypeParser(builtins.timestamptz, 'text'),
-        '_timestamptz': ArrayParser.create(pg.types.getTypeParser(builtins.timestamptz, 'text')),
-        'uuid': pg.types.getTypeParser(builtins.uuid, 'text'),
-        '_uuid': ArrayParser.create(pg.types.getTypeParser(builtins.uuid, 'text')),
-        'jsonb': pg.types.getTypeParser(builtins.jsonb, 'text'),
-        '_jsonb': ArrayParser.create(pg.types.getTypeParser(builtins.jsonb, 'text')),
-        'point': CompositeParser.create(['x', parseFloat8, 'y', parseFloat8]),
-        '_point': ArrayParser.create(CompositeParser.create(['x', parseFloat8, 'y', parseFloat8])),
-        'interval': pg.types.getTypeParser(builtins.interval, 'text'),
-        '_interval': ArrayParser.create(pg.types.getTypeParser(builtins.interval, 'text'),),
-        'bytea': pg.types.getTypeParser(builtins.bytea, 'text'),
-        '_bytea': ArrayParser.create(pg.types.getTypeParser(builtins.bytea, 'text'),),
-    }
 }

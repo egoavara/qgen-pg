@@ -5,6 +5,7 @@
   "compilerOptions": {
     "incremental": true,
     "composite": true,
+    "outDir": "dist",
     "target": "esnext",
     "module": "commonjs",
     "rootDir": "./src",

@@ -1,5 +1,5 @@
 import ts from "typescript"
-import { RunEachQueryField, RunEachQueryOutput, RunEachTypeOutput } from "./program.js"
+import { RunEachQueryField, RunEachQueryOutput } from "./program.js"
 
 function nullableType(ctx: ts.TransformationContext, notNull: boolean, ori: ts.TypeNode, nullType?: 'null' | 'undefined'): ts.TypeNode {
     if (!notNull) {
@@ -66,10 +66,11 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
                             undefined,
                             nullableType(ctx, eaches[0].notNull ?? false, factory.createImportTypeNode(
                                 factory.createLiteralTypeNode(factory.createStringLiteral('qgen')),
+                                undefined,
                                 factory.createIdentifier("QgenTypeParser"),
                                 [
                                     factory.createIndexedAccessTypeNode(
-                                        factory.createImportTypeNode(factory.createLiteralTypeNode(factory.createStringLiteral(ep)), undefined, undefined, true),
+                                        factory.createImportTypeNode(factory.createLiteralTypeNode(factory.createStringLiteral(ep)), undefined, undefined, undefined, true),
                                         factory.createLiteralTypeNode(factory.createStringLiteral('default')),
                                     ),
                                     factory.createLiteralTypeNode(factory.createStringLiteral(eaches[0].type.namespace)),
@@ -121,7 +122,7 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
                             factory.createArrowFunction(
                                 undefined,
                                 undefined,
-                                [factory.createParameterDeclaration(undefined, undefined, undefined, 'raw')],
+                                [factory.createParameterDeclaration(undefined, undefined, 'raw')],
                                 undefined,
                                 factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
                                 factory.createBlock([
@@ -144,25 +145,3 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
     )
 }
 
-
-export const eachParser = (ctx: ts.TransformationContext, runEachType: RunEachTypeOutput) => {
-    const { factory } = ctx
-    // export const name 
-
-    const result = factory.createVariableStatement(
-        [factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-        factory.createVariableDeclarationList([
-            factory.createVariableDeclaration(
-                runEachType.name,
-                undefined,
-                runEachType.type,
-                undefined
-                // factory.createParenthesizedExpression(runEachType.parser)
-            )
-        ], ts.NodeFlags.Const)
-    )
-
-
-    // console.log(result.getFullText())
-    return result
-}

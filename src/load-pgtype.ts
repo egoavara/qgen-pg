@@ -5,6 +5,7 @@ export interface PgTypeCatalog {
     oid: number
     namespace: string
     name: string
+    typcategory:string
     typbasetype: number
     typelem: number
     typrelid: number
@@ -60,6 +61,7 @@ export async function loadPgtypeByOid(tx: BaseType, oid: number): Promise<PgType
     pt."oid"            as "oid"
   , pn.nspname          as "namespace"
   , pt.typname          as "name"
+  , pt.typcategory      as "typcategory"
   , pt.typbasetype      as "typbasetype"
   , pt.typelem          as "typelem"
   , pt.typrelid         as "typrelid"
@@ -79,6 +81,7 @@ where pt."oid" = $1
             oid: temp.rows[0].oid,
             namespace: temp.rows[0].namespace,
             name: temp.rows[0].name,
+            typcategory: temp.rows[0].typcategory,
             typbasetype: temp.rows[0].typbasetype,
             typelem: temp.rows[0].typelem,
             typrelid: temp.rows[0].typrelid,
@@ -95,6 +98,7 @@ where pt."oid" = $1
             oid: temp.rows[0].oid,
             namespace: temp.rows[0].namespace,
             name: temp.rows[0].name,
+            typcategory: temp.rows[0].typcategory,
             typbasetype: temp.rows[0].typbasetype,
             typelem: temp.rows[0].typelem,
             typrelid: temp.rows[0].typrelid,
@@ -149,6 +153,7 @@ where pa.attnum > 0 and pc."oid" = $1
             oid: temp.rows[0].oid,
             namespace: temp.rows[0].namespace,
             name: temp.rows[0].name,
+            typcategory: temp.rows[0].typcategory,
             typbasetype: temp.rows[0].typbasetype,
             typelem: temp.rows[0].typelem,
             typrelid: temp.rows[0].typrelid,
@@ -171,6 +176,7 @@ where pa.attnum > 0 and pc."oid" = $1
         oid: temp.rows[0].oid,
         namespace: temp.rows[0].namespace,
         name: temp.rows[0].name,
+        typcategory: temp.rows[0].typcategory,
         typbasetype: temp.rows[0].typbasetype,
         typelem: temp.rows[0].typelem,
         typrelid: temp.rows[0].typrelid,
