@@ -1,7 +1,10 @@
+import chokidar from "chokidar"
+import fsp from "fs/promises"
 import path from "path"
 import pg from "pg"
 import ts from "typescript"
 import vm from "vm"
+import { ExtensionDefine } from "./extension.js"
 import { loadPgtableAllPgtypeOids, loadPgtypeAllOids, loadPgtypeByOid, PgType, PgTypeClass } from "./load-pgtype.js"
 import { defaultDefines, PgToTsConfig } from "./pg-to-ts.js"
 import { eachQuery } from "./source-eachquery.js"
@@ -43,10 +46,19 @@ export interface RunEachQueryOutput extends StorageQuery {
     name: string
     fields: RunEachQueryField[]
 }
+
+export interface BeginOption {
+
+}
 export class Program {
-    option: Required<ProgramOption>
-    program: ts.Program
-    pool: pg.Pool
+    readonly option: Readonly<Required<ProgramOption>>
+    readonly pool: pg.Pool
+    readonly watcher: chokidar.FSWatcher
+    readonly tsconfig: any
+    readonly printer: ts.Printer
+    #program: ts.Program
+    #dbTypes?: Promise<RunPgTypeOutput>
+    #dbTables?: Promise<RunPgTableOutput>
     constructor(option: ProgramOption) {
         this.option = {
             cwd: (option.cwd ?? process.cwd()).split(path.win32.sep).join(path.posix.sep),
@@ -62,7 +74,21 @@ export class Program {
             pgDatabase: option.pgDatabase ?? "postgres",
             config: option.config ?? {}
         }
-
+        this.watcher = chokidar.watch(this.option.input, {
+            persistent: true,
+            followSymlinks: true,
+            // 
+            cwd: this.option.cwd,
+        })
+        this.pool = new pg.Pool({
+            host: this.option.pgHost,
+            port: this.option.pgPort,
+            user: this.option.pgUsername,
+            password: this.option.pgPassword ?? undefined,
+            database: this.option.pgDatabase,
+        })
+        this.printer = ts.createPrinter()
+        //  
         const configPath = ts.findConfigFile(this.option.cwd, ts.sys.fileExists, this.option.tsconfig)
         if (!configPath) throw Error(`'${this.option.tsconfig}' not found on ${this.option.cwd}`)
 
@@ -79,47 +105,29 @@ export class Program {
             sourceMap: false,
             module: "commonjs",
         }
-
-        const { options, fileNames, errors } = ts.parseJsonConfigFileContent(config, ts.sys, this.option.cwd)
+        this.tsconfig = config
+        // // ====== source from config ======
+        const { options, fileNames, errors } = ts.parseJsonConfigFileContent(this.tsconfig, ts.sys, this.option.cwd)
         if (errors.length > 0) {
             throw errors
         }
-        this.program = ts.createProgram(fileNames, options)
-        this.pool = new pg.Pool({
-            host: this.option.pgHost,
-            port: this.option.pgPort,
-            user: this.option.pgUsername,
-            password: this.option.pgPassword ?? undefined,
-            database: this.option.pgDatabase,
-        })
+        this.#program = ts.createProgram(fileNames, options)
+
     }
-    sources(): string[] {
-        return this.program.getSourceFiles().map(v => v.fileName).filter(v => v.endsWith(".qg.ts") || v.endsWith(".qg.js"));
-    }
-    async runSource(types: RunPgTypeOutput, sources?: string[]): Promise<RunSourceOutput> {
-        const qgenNameToOid: Record<string, Record<string, number>> = {}
-        for (const pgtyp of Object.values(types)) {
-            if (!(pgtyp.namespace in qgenNameToOid)) qgenNameToOid[pgtyp.namespace] = {}
-            qgenNameToOid[pgtyp.namespace][pgtyp.name] = pgtyp.oid
-        }
-        //
-        const availables = this.sources()
-        if (sources !== undefined) {
-            const temp = sources.find(v => !availables.includes(v))
-            if (temp !== undefined) {
-                throw new Error(`unknown source '${temp}'`)
+    async runSource(filename?: string): Promise<RunSourceOutput> {
+        let sources: ts.SourceFile[] = [...this.#program.getSourceFiles().filter(v => v.fileName.endsWith(".qg.ts") || v.fileName.endsWith(".qg.js"))]
+
+        if (filename !== undefined) {
+            const oneFile = this.#program.getSourceFile(filename)
+            if (oneFile === undefined) {
+                throw Error(`no file name ${filename}`)
             }
+            sources = [oneFile]
         }
-        const targets = sources ?? availables
-        const srcmap = Object.fromEntries(this.program.getSourceFiles().map(v => {
-            return [v.fileName, v]
-        }))
-        //
-        const tssources = targets.map(v => srcmap[v])
         const output: RunSourceOutput = {}
-        for (const tssrc of tssources) {
+        for (const tssrc of sources) {
             const jssrc = await new Promise<string>((resolve, reject) => {
-                const result = this.program.emit(
+                const result = this.#program.emit(
                     tssrc,
                     (filename, jssrc) => {
                         if (filename.endsWith(".js")) {
@@ -206,23 +214,13 @@ export class Program {
         }))
         return Object.fromEntries(temp)
     }
-    async runBuild(queryResult: RunQueryOutput, typesOutput: RunPgTypeOutput): Promise<Record<string, string>> {
-
-        const option: PgToTsConfig = {
-            tsNullType: this.option.config.tsNullType ?? "null",
-            unsafeArray : this.option.config.unsafeArray ?? false,
-            extension : this.option.config.extension ?? [],
-            mapping: typesOutput,
-            define: Object.create(defaultDefines),
-        }
-        //
-        const printer = ts.createPrinter()
+    async runBuild(queryResult: RunQueryOutput): Promise<Record<string, string>> {
         const abscwd = path.posix.normalize(path.posix.join(this.option.cwd, this.option.base))
         const entrypoint = path.posix.join(path.posix.normalize(path.posix.join(this.option.cwd, this.option.output)), this.option.entrypoint)
         const entrypointjs = path.posix.relative(this.option.cwd, entrypoint.replace(".ep.ts", ".ep.js"))
         const sources = Object.fromEntries(await Promise.all(Object.entries(queryResult).map<Promise<[string, string]>>(async ([filename, output]) => {
             let outputFileName = path.posix.join(this.option.output, path.posix.relative(abscwd, path.posix.normalize(filename)),).replace(".qg.ts", ".qgout.ts")
-            const originSrc = this.program.getSourceFile(filename)
+            const originSrc = this.#program.getSourceFile(filename)
             if (originSrc === undefined) {
                 throw Error(`${filename} not exist`)
             }
@@ -251,16 +249,99 @@ export class Program {
 
             return [
                 outputFileName,
-                printer.printFile(tsrc),
+                this.printer.printFile(tsrc),
             ]
         })))
-        sources[path.posix.relative(this.option.cwd, entrypoint)] = printer.printFile(createEntrypointSource(this.option.entrypoint, typesOutput, option))
         // 
         return sources
     }
-    exit() {
-        this.pool.end().then(() => {
-            process.exit()
+    async runEntrypoint(typesOutput: RunPgTypeOutput): Promise<Record<string, string>> {
+        const entrypoint = path.posix.join(path.posix.normalize(path.posix.join(this.option.cwd, this.option.output)), this.option.entrypoint)
+        const option: PgToTsConfig = {
+            tsNullType: this.option.config.tsNullType ?? "null",
+            arrayElem: this.option.config.arrayElem ?? "null",
+            extension: this.option.config.extension ?? [],
+            mapping: typesOutput,
+            define: Object.create(defaultDefines),
+        }
+        Object.assign(option.define, ...option.extension.map(ext => ExtensionDefine[ext]))
+        return {
+            [path.posix.relative(this.option.cwd, entrypoint)]: this.printer.printFile(createEntrypointSource(this.option.entrypoint, typesOutput, option))
+        }
+    }
+    //
+    begin(option?: BeginOption): void;
+    begin(option: { once: true } & BeginOption): Promise<void>;
+    begin(option?: { once?: boolean }): any {
+        if (option?.once === true) {
+            return this.step().then(() => {
+                return this.exit()
+            })
+        }
+        this.step().then(() => {
+            this.watcher.on("add", (filepath) => {
+                console.log(`\n# file signature : + ${filepath}`);
+                const { options, fileNames, errors } = ts.parseJsonConfigFileContent(this.tsconfig, ts.sys, this.option.cwd)
+                if (errors.length > 0) {
+                    throw errors
+                }
+                this.#program = ts.createProgram(fileNames, options)
+                this.step(path.posix.join(this.option.cwd, filepath).split(path.sep).join(path.posix.sep))
+            })
+            this.watcher.on("change", (filepath) => {
+                console.log(`\n# file signature : ~ ${filepath}`);
+                const { options, fileNames, errors } = ts.parseJsonConfigFileContent(this.tsconfig, ts.sys, this.option.cwd)
+                if (errors.length > 0) {
+                    throw errors
+                }
+                this.#program = ts.createProgram(fileNames, options)
+                this.step(path.posix.join(this.option.cwd, filepath).split(path.sep).join(path.posix.sep))
+            })
+            this.watcher.on("unlink", (filepath) => {
+                console.log(`\n# file signature : - ${filepath}`);
+            })
+        })
+        return
+    }
+    async step(filename?: string) {
+        console.log("# begin")
+        if (this.#dbTypes === undefined) { this.#dbTypes = this.runPgType() }
+        if (this.#dbTables === undefined) { this.#dbTables = this.runPgTable() }
+        const [dbTypes, dbTables, sources] = await Promise.all([
+            this.#dbTypes,
+            this.#dbTables,
+            this.runSource(filename),
+        ])
+
+        const [ep, build] = await Promise.all([
+            this.runEntrypoint(dbTypes),
+            this.runQuery(dbTypes, dbTables, sources).then((queries) => {
+                return this.runBuild(queries)
+            })
+        ])
+        const filepaths = await Promise.all(Object.entries(Object.assign({}, build, ep)).map(async ([filepath, filetext]) => {
+            await fsp.mkdir(path.posix.dirname(filepath), { recursive: true })
+            await fsp.writeFile(filepath, filetext)
+            return filepath
+        }))
+        console.log(`# extension = ${this.option.config.extension}`)
+        console.log(`# files`)
+        for (const eachfile of filepaths.slice(0, 10)) {
+            console.log(` ^ ${eachfile}`)
+        }
+        if (filepaths.length > 10) {
+            console.log(` ^ ... and more ${filepaths.length - 10}`)
+        }
+    }
+    exit(): Promise<void> {
+        return new Promise<void>((resolve) => {
+            Promise.all([
+                this.watcher.close(),
+                this.pool.end(),
+            ]).then(() => {
+                resolve()
+            })
         })
     }
 }
+

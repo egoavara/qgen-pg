@@ -937,7 +937,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chokidar@npm:^3.3.0":
+"chokidar@npm:^3.3.0, chokidar@npm:^3.5.3":
   version: 3.5.3
   resolution: "chokidar@npm:3.5.3"
   dependencies:
@@ -2493,6 +2493,7 @@ __metadata:
     "@types/pg": ^8.6.5
     "@types/tap": ^15.0.7
     bignumber.js: ^9.0.0
+    chokidar: ^3.5.3
     commander: ^9.4.1
     currency.js: ^2.0.0
     glob: ^8.0.3

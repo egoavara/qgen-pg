@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { Extension } from "./extension.js";
 import { PgType } from "./load-pgtype.js";
 import { pgBuiltins } from "./pg-builtins.js";
 export type Define = Record<number, { type: (factory: ts.NodeFactory) => ts.TypeNode, parser: (factory: ts.NodeFactory) => ts.Expression }>
@@ -68,9 +69,9 @@ export const defaultDefines: Define = {
 
 }
 export interface PgToTsConfig {
-    extension : ("bigint" | "bignumber.js" | "moment" | "currency.js")[]
+    extension : Extension[]
     tsNullType: 'null' | 'undefined', 
-    unsafeArray : boolean
+    arrayElem : 'null' | 'notnull'
     mapping: Record<number, PgType>, 
     define: Define
 }
@@ -115,7 +116,7 @@ export function pgToTsType(factory: ts.NodeFactory, pgtype: PgType, notNull: boo
         case 'alias':
             return modifier(pgToTsType(factory, pgtype.basetype, notNull, option))
         case 'array':
-            if(option.unsafeArray){
+            if(option.arrayElem === 'notnull'){
                 return modifier(factory.createArrayTypeNode(pgToTsType(factory, pgtype.elem, true, option)))
             }
             return modifier(factory.createArrayTypeNode(factory.createUnionTypeNode([

@@ -23,14 +23,15 @@
   "scripts": {
     "compile": "tsc -b ./cjs/tsconfig.json ./esm/tsconfig.json ./types/tsconfig.json",
     "compile:watch": "tsc -b ./cjs/tsconfig.json ./esm/tsconfig.json ./types/tsconfig.json --watch",
-    "test:1":"cd test && yarn qgen build --pg-password test -o src -x bigint -x bignumber.js",
-    "test:2":"cd test && yarn tsc",
-    "test:3":"cd test && node ./lib/main.js"
+    "test:1": "cd test && yarn qgen build --pg-password test -o src -x bigint -x bignumber.js -x currency.js --config-array-elem notnull",
+    "test:2": "cd test && yarn tsc",
+    "test:3": "cd test && node ./lib/main.js"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "chokidar": "^3.5.3",
     "commander": "^9.4.1",
     "glob": "^8.0.3",
     "pg": "^8.7.3"
