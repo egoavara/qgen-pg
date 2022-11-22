@@ -173,32 +173,34 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
 
     // export interface Output { ... }
     namespaceBlock.push(factory.createInterfaceDeclaration([factory.createModifier(ts.SyntaxKind.ExportKeyword)], 'Output', undefined, undefined,
-        Object.entries(fieldsGroupByName).map(([name, eaches]) => {
-            if (eaches.length !== 1) {
-                throw Error(`이름이 같은 필드가 여러개인 경우`)
-            }
-            return factory.createPropertySignature(
-                undefined,
-                factory.createStringLiteral(name),
-                undefined,
-                nullableType(ctx, eaches[0].notNull ?? false, factory.createImportTypeNode(
-                    factory.createLiteralTypeNode(factory.createStringLiteral('qgen')),
+        [
+            ...Object.entries(fieldsGroupByName).map(([name, eaches]) => {
+                if (eaches.length !== 1) {
+                    throw Error(`이름이 같은 필드가 여러개인 경우`)
+                }
+                return factory.createPropertySignature(
                     undefined,
-                    factory.createIdentifier("QgenTypeParser"),
-                    [
-                        factory.createIndexedAccessTypeNode(
-                            factory.createImportTypeNode(factory.createLiteralTypeNode(factory.createStringLiteral(ep)), undefined, undefined, undefined, true),
-                            factory.createLiteralTypeNode(factory.createStringLiteral('default')),
-                        ),
-                        factory.createLiteralTypeNode(factory.createStringLiteral(eaches[0].type.namespace)),
-                        factory.createLiteralTypeNode(factory.createStringLiteral(eaches[0].type.name)),
-                    ]
-                )),
-                // pgToTsTuple(eaches.map((v) => {
-                //     return [v.type, v.notNull ?? false]
-                // }), { pgNullToTs: 'null', mapping })(ctx)
-            )
-        })
+                    factory.createStringLiteral(name),
+                    undefined,
+                    nullableType(ctx, eaches[0].notNull ?? false, factory.createImportTypeNode(
+                        factory.createLiteralTypeNode(factory.createStringLiteral('qgen')),
+                        undefined,
+                        factory.createIdentifier("QgenTypeParser"),
+                        [
+                            factory.createIndexedAccessTypeNode(
+                                factory.createImportTypeNode(factory.createLiteralTypeNode(factory.createStringLiteral(ep)), undefined, undefined, undefined, true),
+                                factory.createLiteralTypeNode(factory.createStringLiteral('default')),
+                            ),
+                            factory.createLiteralTypeNode(factory.createStringLiteral(eaches[0].type.namespace)),
+                            factory.createLiteralTypeNode(factory.createStringLiteral(eaches[0].type.name)),
+                        ]
+                    )),
+                    // pgToTsTuple(eaches.map((v) => {
+                    //     return [v.type, v.notNull ?? false]
+                    // }), { pgNullToTs: 'null', mapping })(ctx)
+                )
+            }),
+        ]
     ))
     // 
     const inputType = factory.createTypeReferenceNode(factory.createQualifiedName(factory.createIdentifier(runEachQuery.name), "Input"))

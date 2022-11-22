@@ -16,4 +16,4 @@ qgen('hello3')
 
 qgen('hello4')
     .option()
-    .query(`select * from bzc.buy_info where buy_id = {{ id }}`)
+    .query(`select * from bzc.buy_info where id = {{ id }}`)

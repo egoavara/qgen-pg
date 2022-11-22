@@ -4,6 +4,7 @@ import path from "path"
 import pg from "pg"
 import ts from "typescript"
 import vm from "vm"
+import { QueryError } from "./errors.js"
 import { ExtensionDefine } from "./extension.js"
 import { loadPgtableAllPgtypeOids, loadPgtypeAllOids, loadPgtypeByOid, PgType, PgTypeClass } from "./load-pgtype.js"
 import { defaultDefines, PgToTsConfig } from "./pg-to-ts.js"
@@ -181,7 +182,6 @@ export class Program {
     }
     async runQuery(pgType: RunPgTypeOutput, pgTable: RunPgTableOutput, sourceResult: RunSourceOutput): Promise<RunQueryOutput> {
         const temp = await Promise.all(Object.entries(sourceResult).map(async ([k, v]): Promise<[string, { query: RunEachQueryOutput[] }]> => {
-
             return [k, {
                 query: await Promise.all(v.query.map(async (query): Promise<RunEachQueryOutput> => {
                     const conn = await this.pool.connect()
@@ -210,12 +210,18 @@ export class Program {
                                 }
                             })
                         }
+                    } catch (err) {
+                        if (err instanceof pg.DatabaseError) {
+                            throw new QueryError(err, path.posix.relative(this.option.cwd, k), query.name, query.text, query.inputs.map(v => v.value))
+                        }
+                        throw err
                     } finally {
                         conn.release()
                     }
                 }))
             }]
         }))
+
         return Object.fromEntries(temp)
     }
     async runBuild(queryResult: RunQueryOutput): Promise<Record<string, string>> {
@@ -358,13 +364,22 @@ export class Program {
                 if (ac.signal.aborted) {
                     return
                 }
-                console.log("# sync database, run sources")
+                console.log("[#] sync database, run sources")
                 // ====================================================================
                 const [ep, build] = await Promise.all([
-                    this.runEntrypoint(dbTypes).then(v => { console.log("# build entrypoint"); return v; }),
+                    this.runEntrypoint(dbTypes).then(v => { console.log("[#] build entrypoint"); return v; }),
                     this.runQuery(dbTypes, dbTables, sources).then((queries) => {
-                        console.log("# run query");
-                        return this.runBuild(queries).then(v => { console.log("# build sources"); return v; })
+                        return this.runBuild(queries).then(v => { console.log("[#] build sources"); return v; })
+                    }).catch((err) => {
+                        if(err instanceof QueryError){
+                            console.log("[#] run query failed detail information follow");
+                            console.log(err.message)
+                            ac.abort()
+                            return {}
+                        }
+                        console.log("[#] unexpected error");
+                        console.error(err)
+                        throw err
                     })
                 ])
                 // 중간취소

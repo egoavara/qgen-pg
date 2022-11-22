@@ -38,10 +38,10 @@ const program = new Program({
         arrayElem: opts.configArrayElem,
     }
 });
-program.begin({ once: true })
-process.on("SIGINT", function () {
+program.begin()
+process.on("SIGINT", function(){
     console.log("[#] user close([SIGINT]) detected")
-    program.exit().then(() => {
+    program.exit().then(()=>{
         process.exit(0);
     })
 })
