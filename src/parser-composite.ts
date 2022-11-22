@@ -70,7 +70,14 @@ export class CompositeParser {
                 case ')':
                 case ',':
                     const [key, parser] = this.#pair[this.#index++]
-                    this.#output[key] = parser(buffer)
+
+                    if (quotedChar === '' && buffer === 'null') {
+                        // TODO : null safe
+                        // @ts-ignore
+                        this.#output[key] = parser(null)
+                    } else {
+                        this.#output[key] = parser(buffer)
+                    }
                     quoted = false
                     quotedChar = ''
                     buffer = ''

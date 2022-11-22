@@ -67,10 +67,17 @@ export namespace PrimitiveParser {
         toISOString(): string
     }
     export type PgParser = (raw: string) => any;
-    export const parseNullable = (fn: PgParser, fallback = null): PgParser => {
-        return (value) => {
-            if (value === null) return fallback;
-            return fn(value);
+    export const parseNullable = (fn: PgParser, fallback: null | undefined = null): PgParser => {
+        if (fallback === null) {
+            return (value) => {
+                if (value === null) return null;
+                return fn(value);
+            }
+        } else {
+            return (value) => {
+                if (value === null) return undefined;
+                return fn(value);
+            }
         }
     };
     export const noParse: PgParser = (value) => String(value);

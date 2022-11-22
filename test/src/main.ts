@@ -1,5 +1,5 @@
 import pg from "pg"
-import { hello } from "./query/test.qgout.js"
+import { hello3 } from "./query/test.qgout.js"
 (async () => {
     const pool = new pg.Pool({
         host: "localhost",
@@ -9,8 +9,8 @@ import { hello } from "./query/test.qgout.js"
         database: "postgres",
     })
     try {
-        const temp = await hello(pool, {})
-        console.log(temp)
+        const temp = await hello3(pool, {})
+        console.log(temp[0].inventoryItem?.price?.toString())
     } finally {
         await pool.end()
     }

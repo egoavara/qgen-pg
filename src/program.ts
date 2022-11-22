@@ -9,7 +9,7 @@ import { loadPgtableAllPgtypeOids, loadPgtypeAllOids, loadPgtypeByOid, PgType, P
 import { defaultDefines, PgToTsConfig } from "./pg-to-ts.js"
 import { eachQuery } from "./source-eachquery.js"
 import { createEntrypointSource } from "./source-entrypoint.js"
-import { QueryHeader } from "./source.js"
+import { QueryHeader } from "./source-query.js"
 import { StorageQuery } from "./storage-query.js"
 import { snakeToCamel } from "./utils.js"
 
@@ -50,12 +50,18 @@ export interface RunEachQueryOutput extends StorageQuery {
 export interface BeginOption {
 
 }
+export interface WatchArg {
+    event: "add" | "unlink" | "change"
+    filepath: string
+}
 export class Program {
     readonly option: Readonly<Required<ProgramOption>>
     readonly pool: pg.Pool
     readonly watcher: chokidar.FSWatcher
     readonly tsconfig: any
     readonly printer: ts.Printer
+    #abort: AbortController
+    #abortBuffer: WatchArg[]
     #program: ts.Program
     #dbTypes?: Promise<RunPgTypeOutput>
     #dbTables?: Promise<RunPgTableOutput>
@@ -112,17 +118,15 @@ export class Program {
             throw errors
         }
         this.#program = ts.createProgram(fileNames, options)
+        this.#abort = new AbortController()
+        this.#abortBuffer = []
 
     }
-    async runSource(filename?: string): Promise<RunSourceOutput> {
+    async runSource(filenames?: string[]): Promise<RunSourceOutput> {
         let sources: ts.SourceFile[] = [...this.#program.getSourceFiles().filter(v => v.fileName.endsWith(".qg.ts") || v.fileName.endsWith(".qg.js"))]
 
-        if (filename !== undefined) {
-            const oneFile = this.#program.getSourceFile(filename)
-            if (oneFile === undefined) {
-                throw Error(`no file name ${filename}`)
-            }
-            sources = [oneFile]
+        if (filenames !== undefined) {
+            sources = sources.filter(v => filenames.includes(v.fileName))
         }
         const output: RunSourceOutput = {}
         for (const tssrc of sources) {
@@ -280,58 +284,138 @@ export class Program {
         }
         this.step().then(() => {
             this.watcher.on("add", (filepath) => {
-                console.log(`\n# file signature : + ${filepath}`);
                 const { options, fileNames, errors } = ts.parseJsonConfigFileContent(this.tsconfig, ts.sys, this.option.cwd)
                 if (errors.length > 0) {
                     throw errors
                 }
                 this.#program = ts.createProgram(fileNames, options)
-                this.step(path.posix.join(this.option.cwd, filepath).split(path.sep).join(path.posix.sep))
+                this.#abortBuffer.push({ event: "add", filepath: path.posix.join(this.option.cwd, filepath).split(path.sep).join(path.posix.sep) })
+                this.step(this.#abortBuffer)
             })
             this.watcher.on("change", (filepath) => {
-                console.log(`\n# file signature : ~ ${filepath}`);
                 const { options, fileNames, errors } = ts.parseJsonConfigFileContent(this.tsconfig, ts.sys, this.option.cwd)
                 if (errors.length > 0) {
                     throw errors
                 }
                 this.#program = ts.createProgram(fileNames, options)
-                this.step(path.posix.join(this.option.cwd, filepath).split(path.sep).join(path.posix.sep))
+                this.#abortBuffer.push({ event: "change", filepath: path.posix.join(this.option.cwd, filepath).split(path.sep).join(path.posix.sep) })
+                this.step(this.#abortBuffer)
             })
             this.watcher.on("unlink", (filepath) => {
-                console.log(`\n# file signature : - ${filepath}`);
+                const { options, fileNames, errors } = ts.parseJsonConfigFileContent(this.tsconfig, ts.sys, this.option.cwd)
+                if (errors.length > 0) {
+                    throw errors
+                }
+                this.#program = ts.createProgram(fileNames, options)
+                this.#abortBuffer.push({ event: "unlink", filepath: path.posix.join(this.option.cwd, filepath).split(path.sep).join(path.posix.sep) })
+                this.step(this.#abortBuffer)
             })
         })
         return
     }
-    async step(filename?: string) {
-        console.log("# begin")
-        if (this.#dbTypes === undefined) { this.#dbTypes = this.runPgType() }
-        if (this.#dbTables === undefined) { this.#dbTables = this.runPgTable() }
-        const [dbTypes, dbTables, sources] = await Promise.all([
-            this.#dbTypes,
-            this.#dbTables,
-            this.runSource(filename),
-        ])
+    async step(events?: WatchArg[]) {
+        this.#abort.abort()
+        console.clear()
+        // 
+        const ac = new AbortController()
+        const signal = new Promise<void>(resolve => ac.signal.addEventListener("abort", () => resolve()))
+        this.#abort = ac
+        // 
+        let groupedEvents: undefined | { 'add': string[], 'unlink': string[], 'change': string[] } = undefined
+        if (events !== undefined) {
+            groupedEvents = { add: [], unlink: [], change: [] }
+            for (const e of events) {
+                groupedEvents[e.event].push(e.filepath)
+            }
+        }
+        const addWatch = events?.filter((v) => v.event === 'add')?.map(v => v.filepath)
+        const modWatch = events?.filter((v) => v.event === 'change')?.map(v => v.filepath)
+        const delWatch = events?.filter((v) => v.event === 'unlink')?.map(v => v.filepath)
+        // 
+        await Promise.race([
+            signal,
+            (async () => {
+                // ====================================================================
+                if (this.#dbTypes === undefined) { this.#dbTypes = this.runPgType() }
+                if (this.#dbTables === undefined) { this.#dbTables = this.runPgTable() }
+                // ====================================================================
+                let runTargets: undefined | string[] = undefined
+                if (!(modWatch === undefined && addWatch === undefined)) {
+                    runTargets = []
+                    if (addWatch !== undefined) {
+                        runTargets.push(...addWatch)
+                    }
+                    if (modWatch !== undefined) {
+                        runTargets.push(...modWatch)
+                    }
+                }
+                const [dbTypes, dbTables, sources] = await Promise.all([
+                    this.#dbTypes,
+                    this.#dbTables,
+                    this.runSource(groupedEvents !== undefined ? [...groupedEvents.add, ...groupedEvents.change] : undefined),
+                ])
+                // 중간취소
+                if (ac.signal.aborted) {
+                    return
+                }
+                console.log("# sync database, run sources")
+                // ====================================================================
+                const [ep, build] = await Promise.all([
+                    this.runEntrypoint(dbTypes).then(v => { console.log("# build entrypoint"); return v; }),
+                    this.runQuery(dbTypes, dbTables, sources).then((queries) => {
+                        console.log("# run query");
+                        return this.runBuild(queries).then(v => { console.log("# build sources"); return v; })
+                    })
+                ])
+                // 중간취소
+                if (ac.signal.aborted) {
+                    return
+                }
 
-        const [ep, build] = await Promise.all([
-            this.runEntrypoint(dbTypes),
-            this.runQuery(dbTypes, dbTables, sources).then((queries) => {
-                return this.runBuild(queries)
-            })
+                // ====================================================================
+                this.#abortBuffer = []
+                const filepaths = await Promise.all(Object.entries(Object.assign({}, build, ep)).map(async ([filepath, filetext]) => {
+                    await fsp.mkdir(path.posix.dirname(filepath), { recursive: true })
+                    await fsp.writeFile(filepath, filetext)
+                    return filepath
+                }))
+                // ====================================================================
+                console.log(`# extension = ${this.option.config.extension?.join(", ")}`)
+                console.log(`# files`)
+                if (groupedEvents === undefined) {
+                    for (const eachfile of filepaths.slice(0, 10)) {
+                        console.log(`  + ${eachfile}`)
+                    }
+                    if (filepaths.length > 10) {
+                        console.log(`  <... and more ${filepaths.length - 10}>`)
+                    }
+                } else {
+                    const printer = [
+                        ...groupedEvents.add.map(v => ['add', v] as const),
+                        ...groupedEvents.change.map(v => ['change', v] as const),
+                        ...groupedEvents.unlink.map(v => ['unlink', v] as const),
+                    ].sort(([_0, fp0], [_1, fp1]) => {
+                        return fp0.localeCompare(fp1)
+                    })
+                    for (const [ev, fp] of printer.slice(0, 10)) {
+                        switch (ev) {
+                            case "add":
+                                console.log(`  + ${path.posix.relative(this.option.cwd, fp)}`)
+                                break
+                            case "change":
+                                console.log(`  ~ ${path.posix.relative(this.option.cwd, fp)}`)
+                                break
+                            case "unlink":
+                                console.log(`  - ${path.posix.relative(this.option.cwd, fp)}`)
+                                break
+                        }
+                        if (filepaths.length > 10) {
+                            console.log(`  <... and more ${printer.length - 10}>`)
+                        }
+                    }
+                }
+            })(),
         ])
-        const filepaths = await Promise.all(Object.entries(Object.assign({}, build, ep)).map(async ([filepath, filetext]) => {
-            await fsp.mkdir(path.posix.dirname(filepath), { recursive: true })
-            await fsp.writeFile(filepath, filetext)
-            return filepath
-        }))
-        console.log(`# extension = ${this.option.config.extension}`)
-        console.log(`# files`)
-        for (const eachfile of filepaths.slice(0, 10)) {
-            console.log(` ^ ${eachfile}`)
-        }
-        if (filepaths.length > 10) {
-            console.log(` ^ ... and more ${filepaths.length - 10}`)
-        }
     }
     exit(): Promise<void> {
         return new Promise<void>((resolve) => {

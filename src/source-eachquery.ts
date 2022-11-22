@@ -36,16 +36,15 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
     // 
     // export async function ${runEachQuery.name}(conn: ${connCompatible}, input: {...}):Promise<{...}[]>{$body}
     return factory.createFunctionDeclaration(
-        [], // no decorator,
         [factory.createModifier(ts.SyntaxKind.ExportKeyword), factory.createModifier(ts.SyntaxKind.AsyncKeyword)], // export
         undefined, // no asterisk(aka. generator syntax)
         runEachQuery.name,
         [],
         [
             // conn : Pick<pg.Client, "query">
-            factory.createParameterDeclaration([], [], undefined, 'conn', undefined, connCompatible, undefined),
+            factory.createParameterDeclaration([], undefined, 'conn', undefined, connCompatible, undefined),
             // input : {...}
-            factory.createParameterDeclaration([], [], undefined, 'input', undefined,
+            factory.createParameterDeclaration([], undefined, 'input', undefined,
                 factory.createTypeLiteralNode(
                     runEachQuery.inputs.map(({ key, type }) => {
                         return factory.createPropertySignature(undefined, key, factory.createToken(ts.SyntaxKind.QuestionToken), type)
