@@ -188,7 +188,7 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
                             factory.createStringLiteral(i.toString()),
                             undefined,
                             nullableType(ctx, each.notNull ?? false, factory.createImportTypeNode(
-                                factory.createLiteralTypeNode(factory.createStringLiteral('sqlfn')),
+                                factory.createLiteralTypeNode(factory.createStringLiteral("@egoavara/sqlfn")),
                                 undefined,
                                 factory.createIdentifier("TypeParser"),
                                 [
@@ -213,7 +213,7 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
                         undefined,
                         factory.createTupleTypeNode(eaches.map(each => {
                             return nullableType(ctx, each.notNull ?? false, factory.createImportTypeNode(
-                                factory.createLiteralTypeNode(factory.createStringLiteral('sqlfn')),
+                                factory.createLiteralTypeNode(factory.createStringLiteral("@egoavara/sqlfn")),
                                 undefined,
                                 factory.createIdentifier("TypeParser"),
                                 [
@@ -236,7 +236,7 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
                     factory.createStringLiteral(name),
                     undefined,
                     nullableType(ctx, eaches[0].notNull ?? false, factory.createImportTypeNode(
-                        factory.createLiteralTypeNode(factory.createStringLiteral('sqlfn')),
+                        factory.createLiteralTypeNode(factory.createStringLiteral("@egoavara/sqlfn")),
                         undefined,
                         factory.createIdentifier("TypeParser"),
                         [

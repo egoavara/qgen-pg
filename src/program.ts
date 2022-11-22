@@ -1,6 +1,5 @@
 import chokidar from "chokidar"
 import fsp from "fs/promises"
-import { Module } from "module"
 import path from "path"
 import pg from "pg"
 import ts from "typescript"
@@ -71,7 +70,7 @@ export class Program {
     constructor(option: ProgramOption) {
         this.option = {
             cwd: (option.cwd ?? process.cwd()).split(path.win32.sep).join(path.posix.sep),
-            input: option.input ?? ["./**/*.qg.ts", "./**/*.qg.js"],
+            input: option.input ?? ["./**/*.sql.ts", "./**/*.sql.js"],
             output: option.output ?? ".",
             base: option.base ?? ".",
             entrypoint: option.entrypoint ?? "./sqlfn.ep.ts",
@@ -106,7 +105,8 @@ export class Program {
             throw error
         }
 
-        config.include = ['./**/*.qg.ts', './**/*.qg.js', this.option.entrypoint]
+        config.include = [...this.option.input]
+        config.exclude = []
         config.compilerOptions = {
             ...(config.compilerOptions ?? {}),
             allowJs: true,
@@ -126,7 +126,7 @@ export class Program {
 
     }
     async runSource(filenames?: string[]): Promise<RunSourceOutput> {
-        let sources: ts.SourceFile[] = [...this.#program.getSourceFiles().filter(v => v.fileName.endsWith(".qg.ts") || v.fileName.endsWith(".qg.js"))]
+        let sources: ts.SourceFile[] = [...this.#program.getSourceFiles().filter(v => v.fileName.endsWith(".sql.ts") || v.fileName.endsWith(".sql.js"))]
 
         if (filenames !== undefined) {
             sources = sources.filter(v => filenames.includes(v.fileName))
@@ -244,7 +244,7 @@ export class Program {
         const entrypoint = path.posix.join(path.posix.normalize(path.posix.join(this.option.cwd, this.option.output)), this.option.entrypoint)
         const entrypointjs = path.posix.relative(this.option.cwd, entrypoint.replace(".ep.ts", ".ep.js"))
         const sources = Object.fromEntries(await Promise.all(Object.entries(queryResult).map<Promise<[string, string]>>(async ([filename, output]) => {
-            let outputFileName = path.posix.join(this.option.output, path.posix.relative(abscwd, path.posix.normalize(filename)),).replace(".qg.ts", ".qgout.ts")
+            let outputFileName = path.posix.join(this.option.output, path.posix.relative(abscwd, path.posix.normalize(filename)),).replace(".sql.ts", ".sqlfn.ts")
             const originSrc = this.#program.getSourceFile(filename)
             if (originSrc === undefined) {
                 throw Error(`${filename} not exist`)

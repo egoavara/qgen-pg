@@ -5,7 +5,7 @@ import { PgType } from "./load-pgtype.js"
 import { PgToTsConfig, pgToTsParser, pgToTsType } from "./pg-to-ts.js"
 import { RunPgTypeOutput } from "./program.js"
 
-const EntrypointHeader = `import { sqlfn, PrimitiveParser as PP, ArrayParser as AP, CompositeParser as CP } from "sqlfn";`
+const EntrypointHeader = `import { sqlfn, PrimitiveParser as PP, ArrayParser as AP, CompositeParser as CP } from "@egoavara/sqlfn";`
 export const createEntrypointSource = (filepath: string, pgtypes: RunPgTypeOutput, option: PgToTsConfig) => {
     //
     const groupNs: Record<string, Record<string, PgType>> = {}
@@ -73,7 +73,7 @@ export const createEntrypointSource = (filepath: string, pgtypes: RunPgTypeOutpu
                     argdef,
                     factory.createExportDefault(factory.createCallExpression(
                         factory.createPropertyAccessExpression(
-                            factory.createCallExpression(factory.createIdentifier('sqlfn'), undefined, [factory.createStringLiteral("type")]),
+                            factory.createCallExpression(factory.createIdentifier("sqlfn"), undefined, [factory.createStringLiteral("type")]),
                             'setup'
                         ),
                         [

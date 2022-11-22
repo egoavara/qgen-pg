@@ -1,6 +1,6 @@
 {
-  "name": "sqlfn",
-  "version": "0.0.1",
+  "name": "@egoavara/sqlfn",
+  "version": "0.0.6",
   "description": "",
   "bin": {
     "sqlfnc": "./bin/sqlfnc.js"

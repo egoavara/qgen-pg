@@ -7,7 +7,7 @@ const args = commander
     .option('-b, --base <dirpath>', 'base file path', '.')
     .option('-e, --entrypoint <filepath>', 'output entrypoint file path, relative form output path', './sqlfn.ep.ts')
     .option('-o, --output <dirpath>', 'output dir path', '.')
-    .option('-i, --input <patterns...>', 'input pattern', ['./**/*.qg.ts', './**/*.qg.js',])
+    .option('-i, --input <patterns...>', 'input pattern', ['./**/*.sql.ts', './**/*.sql.js',])
     .option('-t, --tsconfig <tsconfigpath>', 'tsconfig.json file path', './tsconfig.json')
     .option('-x, --config-extension <extension...>', 'extension select', [])
     .option('--config-array-elem <mode>', 'global array element nullable configuration : (null | notnull)', 'null')
