@@ -1,19 +1,18 @@
 
 
-import { qgen } from "qgen";
+import { sqlfn } from "sqlfn"
 
 
 
-qgen('hello')
+sqlfn('hello')
     .exact(Infinity)
     .query('select * from test')
-qgen('hello2')
+sqlfn('hello2')
     .void()
     .query(`select * from bzc.buy_info`)
-qgen('hello3')
+sqlfn('hello3')
     .exact(1)
     .query(`select $$('null',1,1)$$::inventory_item`)
-
-qgen('hello4')
+sqlfn('hello4')
     .option()
     .query(`select * from bzc.buy_info where id = {{ id }}`)

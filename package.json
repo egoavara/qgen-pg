@@ -1,8 +1,10 @@
 {
-  "name": "qgen",
+  "name": "sqlfn",
   "version": "0.0.1",
   "description": "",
-  "bin": "./bin/qgen.js",
+  "bin": {
+    "sqlfnc": "./bin/sqlfnc.js"
+  },
   "main": "./lib/index.js",
   "types": "./types/index.d.ts",
   "exports": {
@@ -23,8 +25,8 @@
   "scripts": {
     "compile": "tsc -b ./cjs/tsconfig.json ./esm/tsconfig.json ./types/tsconfig.json",
     "compile:watch": "tsc -b ./cjs/tsconfig.json ./esm/tsconfig.json ./types/tsconfig.json --watch",
-    "testrun:build": "cd test && yarn qgen build --pg-password test -o src -x bigint -x bignumber.js -x currency.js --config-array-elem notnull",
-    "testrun:watch": "cd test && yarn qgen watch --pg-password test -o src -x bigint -x bignumber.js -x currency.js --config-array-elem notnull",
+    "testrun:build": "cd test && yarn sqlfnc build --pg-password test -o src -x bigint -x bignumber.js -x currency.js --config-array-elem notnull",
+    "testrun:watch": "cd test && yarn sqlfnc watch --pg-password test -o src -x bigint -x bignumber.js -x currency.js --config-array-elem notnull",
     "test:2": "cd test && yarn tsc",
     "test:3": "cd test && node ./lib/main.js"
   },

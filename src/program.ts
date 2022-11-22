@@ -72,7 +72,7 @@ export class Program {
             input: option.input ?? ["./**/*.qg.ts", "./**/*.qg.js"],
             output: option.output ?? ".",
             base: option.base ?? ".",
-            entrypoint: option.entrypoint ?? "./qgen.ep.ts",
+            entrypoint: option.entrypoint ?? "./sqlfn.ep.ts",
             tsconfig: option.tsconfig ?? "./tsconfig.json",
             pgHost: option.pgHost ?? "localhost",
             pgPort: option.pgPort ?? 5432,
@@ -153,7 +153,7 @@ export class Program {
                 require,
             })
             StorageQuery.clear()
-            vm.runInContext(jssrc, sandbox, { filename: 'qgen.mjs' })
+            vm.runInContext(jssrc, sandbox, { filename: 'sqlfn.mjs' })
             output[tssrc.fileName] = {
                 query: StorageQuery.copy(),
             }

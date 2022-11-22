@@ -1,7 +1,7 @@
 
 
-export const QueryHeader = (ep: string) => `// qgen query ...
+export const QueryHeader = (ep: string) => `// sqlfn query ...
 import type pg from 'pg';
-import type { FixedArray } from 'qgen';
-import _QGEN_EP from ${JSON.stringify(ep)}
+import type { FixedArray } from 'sqlfn';
+import _SQLFN_EP from ${JSON.stringify(ep)}
 `

@@ -70,7 +70,7 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
                             ))
                         ] : []),
                         //
-                        factory.createPropertyAssignment('types', factory.createIdentifier('_QGEN_EP')),
+                        factory.createPropertyAssignment('types', factory.createIdentifier('_SQLFN_EP')),
                     ])
                 ]
             ))
@@ -183,9 +183,9 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
                     factory.createStringLiteral(name),
                     undefined,
                     nullableType(ctx, eaches[0].notNull ?? false, factory.createImportTypeNode(
-                        factory.createLiteralTypeNode(factory.createStringLiteral('qgen')),
+                        factory.createLiteralTypeNode(factory.createStringLiteral('sqlfn')),
                         undefined,
-                        factory.createIdentifier("QgenTypeParser"),
+                        factory.createIdentifier("TypeParser"),
                         [
                             factory.createIndexedAccessTypeNode(
                                 factory.createImportTypeNode(factory.createLiteralTypeNode(factory.createStringLiteral(ep)), undefined, undefined, undefined, true),

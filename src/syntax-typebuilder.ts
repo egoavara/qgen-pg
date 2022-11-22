@@ -51,7 +51,7 @@ export class TypeBuilder<Type> implements pg.CustomTypesConfig {
         return pg.types.getTypeParser(id, format)
     }
 }
-export type QgenTypeParser<T, NS, NM> = T extends TypeBuilder<infer Parser>
+export type TypeParser<T, NS, NM> = T extends TypeBuilder<infer Parser>
     ? (
         NS extends keyof Parser
         ? (
