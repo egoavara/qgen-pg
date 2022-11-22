@@ -27,8 +27,7 @@
     "compile:watch": "tsc -b ./cjs/tsconfig.json ./esm/tsconfig.json ./types/tsconfig.json --watch",
     "testrun:build": "cd test && yarn sqlfnc build --pg-password test -o src -x bigint -x bignumber.js -x currency.js --config-array-elem notnull",
     "testrun:watch": "cd test && yarn sqlfnc watch --pg-password test -o src -x bigint -x bignumber.js -x currency.js --config-array-elem notnull",
-    "test:2": "cd test && yarn tsc",
-    "test:3": "cd test && node ./lib/main.js"
+    "testrun:test": "cd test && yarn tsc && node ./lib/main.js"
   },
   "keywords": [],
   "author": "",

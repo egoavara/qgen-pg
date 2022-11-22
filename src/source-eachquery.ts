@@ -41,8 +41,14 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
         fieldsGroupByName[field.name].push(field)
     }
     // 각 필드의 배열상 위치를 집계
-    const eachinto: Record<string, number | number[]> = Object.fromEntries(runEachQuery.fields.map(({ name }) => [name, -1]))
+    const eachinto: Record<string, number | number[]> = {}
     for (const [name, typs] of Object.entries(fieldsGroupByName)) {
+        if(name === "?column?"){
+            for(const [i, typ] of typs.entries()){
+                eachinto[i.toString()] = typ.index
+            }
+            continue
+        }
         if (typs.length === 1) {
             eachinto[name] = typs[0].index
         } else {
@@ -82,7 +88,7 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
             functionBlock.push(factory.createIfStatement(
                 factory.createLessThan(helpIdentifier(factory, "result", "rowCount"), factory.createNumericLiteral(1)),
                 factory.createReturnStatement(factory.createIdentifier("undefined"))
-            ));
+            ))
             functionBlock.push(factory.createReturnStatement(factory.createObjectLiteralExpression(Object.entries(eachinto).map(([name, idx]) => {
                 return factory.createPropertyAssignment(
                     factory.createStringLiteral(name),
@@ -97,12 +103,12 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
             functionBlock.push(factory.createIfStatement(
                 factory.createGreaterThan(helpIdentifier(factory, "result", "rowCount"), factory.createNumericLiteral(1)),
                 factory.createThrowStatement(factory.createCallExpression(factory.createIdentifier("Error"), undefined, [factory.createStringLiteral(`must be 0 or 1 row count`)]))
-            ));
+            ))
             // if(result.rowCount < 1) return undefined
             functionBlock.push(factory.createIfStatement(
                 factory.createLessThan(helpIdentifier(factory, "result", "rowCount"), factory.createNumericLiteral(1)),
                 factory.createReturnStatement(factory.createIdentifier("undefined"))
-            ));
+            ))
             functionBlock.push(factory.createReturnStatement(factory.createObjectLiteralExpression(Object.entries(eachinto).map(([name, idx]) => {
                 return factory.createPropertyAssignment(
                     factory.createStringLiteral(name),
@@ -122,7 +128,7 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
                 functionBlock.push(factory.createIfStatement(
                     factory.createStrictInequality(helpIdentifier(factory, "result", "rowCount"), factory.createNumericLiteral(runEachQuery.mode)),
                     factory.createThrowStatement(factory.createCallExpression(factory.createIdentifier("Error"), undefined, [factory.createStringLiteral(`not expected row count ${runEachQuery.mode}`)]))
-                ));
+                ))
             }
             // const transformedRows: any = result.rows.map($1)
             functionBlock.push(factory.createVariableStatement(undefined, factory.createVariableDeclarationList([
@@ -175,10 +181,57 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
     namespaceBlock.push(factory.createInterfaceDeclaration([factory.createModifier(ts.SyntaxKind.ExportKeyword)], 'Output', undefined, undefined,
         [
             ...Object.entries(fieldsGroupByName).map(([name, eaches]) => {
-                if (eaches.length !== 1) {
-                    throw Error(`이름이 같은 필드가 여러개인 경우`)
+                if(name === "?column?"){
+                    return eaches.map((each, i)=>{
+                        return factory.createPropertySignature(
+                            undefined,
+                            factory.createStringLiteral(i.toString()),
+                            undefined,
+                            nullableType(ctx, each.notNull ?? false, factory.createImportTypeNode(
+                                factory.createLiteralTypeNode(factory.createStringLiteral('sqlfn')),
+                                undefined,
+                                factory.createIdentifier("TypeParser"),
+                                [
+                                    factory.createIndexedAccessTypeNode(
+                                        factory.createImportTypeNode(factory.createLiteralTypeNode(factory.createStringLiteral(ep)), undefined, undefined, undefined, true),
+                                        factory.createLiteralTypeNode(factory.createStringLiteral('default')),
+                                    ),
+                                    factory.createLiteralTypeNode(factory.createStringLiteral(each.type.namespace)),
+                                    factory.createLiteralTypeNode(factory.createStringLiteral(each.type.name)),
+                                ]
+                            )),
+                            // pgToTsTuple(eaches.map((v) => {
+                            //     return [v.type, v.notNull ?? false]
+                            // }), { pgNullToTs: 'null', mapping })(ctx)
+                        )
+                    })
                 }
-                return factory.createPropertySignature(
+                if (eaches.length > 1) {
+                    return [factory.createPropertySignature(
+                        undefined,
+                        factory.createStringLiteral(name),
+                        undefined,
+                        factory.createTupleTypeNode(eaches.map(each => {
+                            return nullableType(ctx, each.notNull ?? false, factory.createImportTypeNode(
+                                factory.createLiteralTypeNode(factory.createStringLiteral('sqlfn')),
+                                undefined,
+                                factory.createIdentifier("TypeParser"),
+                                [
+                                    factory.createIndexedAccessTypeNode(
+                                        factory.createImportTypeNode(factory.createLiteralTypeNode(factory.createStringLiteral(ep)), undefined, undefined, undefined, true),
+                                        factory.createLiteralTypeNode(factory.createStringLiteral('default')),
+                                    ),
+                                    factory.createLiteralTypeNode(factory.createStringLiteral(each.type.namespace)),
+                                    factory.createLiteralTypeNode(factory.createStringLiteral(each.type.name)),
+                                ]
+                            ))
+                        }))
+                        // pgToTsTuple(eaches.map((v) => {
+                        //     return [v.type, v.notNull ?? false]
+                        // }), { pgNullToTs: 'null', mapping })(ctx)
+                    )]
+                }
+                return [factory.createPropertySignature(
                     undefined,
                     factory.createStringLiteral(name),
                     undefined,
@@ -198,8 +251,8 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
                     // pgToTsTuple(eaches.map((v) => {
                     //     return [v.type, v.notNull ?? false]
                     // }), { pgNullToTs: 'null', mapping })(ctx)
-                )
-            }),
+                )]
+            }).flat(),
         ]
     ))
     // 

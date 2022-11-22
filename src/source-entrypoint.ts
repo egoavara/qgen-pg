@@ -73,7 +73,7 @@ export const createEntrypointSource = (filepath: string, pgtypes: RunPgTypeOutpu
                     argdef,
                     factory.createExportDefault(factory.createCallExpression(
                         factory.createPropertyAccessExpression(
-                            factory.createCallExpression(factory.createIdentifier('sqlfn'), undefined, []),
+                            factory.createCallExpression(factory.createIdentifier('sqlfn'), undefined, [factory.createStringLiteral("type")]),
                             'setup'
                         ),
                         [

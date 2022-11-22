@@ -1,11 +1,11 @@
 import { QueryBuilder } from "./syntax-querybuilder.js"
 import { TypeBuilder } from "./syntax-typebuilder.js"
 
-export function sqlfn(name: string): QueryBuilder
-export function sqlfn(): TypeBuilder<Record<string, never>>
-export function sqlfn(name?: string) {
-    if (name === undefined) {
+export function sqlfn(): QueryBuilder
+export function sqlfn(mode: "type"): TypeBuilder<Record<string, never>>
+export function sqlfn(mode? : string) {
+    if (mode === "type") {
         return new TypeBuilder({}, {})
     }
-    return new QueryBuilder(name)
+    return new QueryBuilder()
 }

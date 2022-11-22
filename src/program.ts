@@ -1,5 +1,6 @@
 import chokidar from "chokidar"
 import fsp from "fs/promises"
+import { Module } from "module"
 import path from "path"
 import pg from "pg"
 import ts from "typescript"
@@ -12,6 +13,7 @@ import { eachQuery } from "./source-eachquery.js"
 import { createEntrypointSource } from "./source-entrypoint.js"
 import { QueryHeader } from "./source-query.js"
 import { StorageQuery } from "./storage-query.js"
+import { QueryBuilder } from "./syntax-querybuilder.js"
 import { snakeToCamel } from "./utils.js"
 
 export interface ProgramOption {
@@ -148,15 +150,28 @@ export class Program {
                     reject(result.diagnostics)
                 }
             })
+            // ((path) => {
+            //     console.log("PROGRAM : ", path)
+            //     if (path === '$$__SQLFN__$$') {
+            //         return result
+            //     }
+            //     require.resolve
+            //     return require(path)
+            // })
             const sandbox = vm.createContext({
                 exports: {},
-                require,
+                require: require,
             })
-            StorageQuery.clear()
+
             vm.runInContext(jssrc, sandbox, { filename: 'sqlfn.mjs' })
-            output[tssrc.fileName] = {
-                query: StorageQuery.copy(),
+            const query: StorageQuery[] = []
+            for (const [k, v] of Object.entries(sandbox.exports)) {
+                if (v instanceof QueryBuilder) {
+                    v.ref.name = k
+                    query.push(v.ref)
+                }
             }
+            output[tssrc.fileName] = { query, }
         }
         return output
     }
@@ -280,8 +295,8 @@ export class Program {
         }
     }
     //
-    begin(option?: BeginOption): void;
-    begin(option: { once: true } & BeginOption): Promise<void>;
+    begin(option?: BeginOption): void
+    begin(option: { once: true } & BeginOption): Promise<void>
     begin(option?: { once?: boolean }): any {
         if (option?.once === true) {
             return this.step().then(() => {
@@ -367,17 +382,17 @@ export class Program {
                 console.log("[#] sync database, run sources")
                 // ====================================================================
                 const [ep, build] = await Promise.all([
-                    this.runEntrypoint(dbTypes).then(v => { console.log("[#] build entrypoint"); return v; }),
+                    this.runEntrypoint(dbTypes).then(v => { console.log("[#] build entrypoint"); return v }),
                     this.runQuery(dbTypes, dbTables, sources).then((queries) => {
-                        return this.runBuild(queries).then(v => { console.log("[#] build sources"); return v; })
+                        return this.runBuild(queries).then(v => { console.log("[#] build sources"); return v })
                     }).catch((err) => {
-                        if(err instanceof QueryError){
-                            console.log("[#] run query failed detail information follow");
+                        if (err instanceof QueryError) {
+                            console.log("[#] run query failed detail information follow")
                             console.log(err.message)
                             ac.abort()
                             return {}
                         }
-                        console.log("[#] unexpected error");
+                        console.log("[#] unexpected error")
                         console.error(err)
                         throw err
                     })

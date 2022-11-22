@@ -11,15 +11,15 @@ export interface StorageQuery {
     }[]
 }
 
-export namespace StorageQuery {
-    let secret: StorageQuery[] = []
-    export function push(val: StorageQuery) {
-        secret.push(val)
-    }
-    export function clear() {
-        secret = []
-    }
-    export function copy() {
-        return Array.from(secret)
-    }
-}
+// export namespace StorageQuery {
+//     let secret: StorageQuery[] = []
+//     export function push(val: StorageQuery) {
+//         secret.push(val)
+//     }
+//     export function clear() {
+//         secret = []
+//     }
+//     export function copy() {
+//         return Array.from(secret)
+//     }
+// }
