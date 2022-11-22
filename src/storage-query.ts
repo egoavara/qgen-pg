@@ -3,6 +3,7 @@ import ts from "typescript"
 export interface StorageQuery {
     name: string
     text: string
+    mode: "void" | "option" | "first" | number
     inputs: {
         key: string
         type: ts.TypeNode

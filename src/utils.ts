@@ -35,3 +35,8 @@ export function snakeToCamel(name: string): string {
         return v.slice(0, 1).toUpperCase() + v.slice(1)
     }).join("")
 }
+
+
+export type FixedArray<T extends Array<any>> =
+    & Omit<T, 'splice' | 'push' | 'pop' | 'shift' | 'unshift' | number>
+    & { [Symbol.iterator]: () => IterableIterator<T extends Array<infer TItems> ? TItems : never> }

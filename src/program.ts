@@ -243,7 +243,7 @@ export class Program {
                                     ...node.statements,
                                     ...output.query.map((val) => {
                                         return eachQuery(ctx, val, relep)
-                                    })
+                                    }).flat()
                                 ]
                             )
                         }

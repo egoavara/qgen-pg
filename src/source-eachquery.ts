@@ -1,6 +1,21 @@
 import ts from "typescript"
 import { RunEachQueryField, RunEachQueryOutput } from "./program.js"
 
+const helpIdentifier = (f: ts.NodeFactory, first: string, ...args: (string | number)[]): ts.Expression => {
+    if (args.length === 0) {
+        return f.createIdentifier(first)
+    }
+    const last = args[args.length - 1]
+    if (typeof last === 'number') {
+        if (!Number.isFinite(last)) {
+            throw new Error("number must be finite")
+        }
+        return f.createElementAccessExpression(helpIdentifier(f, first, ...args.slice(0, args.length - 1)), last)
+    }
+
+    return f.createPropertyAccessExpression(helpIdentifier(f, first, ...args.slice(0, args.length - 1)), last)
+}
+
 function nullableType(ctx: ts.TransformationContext, notNull: boolean, ori: ts.TypeNode, nullType?: 'null' | 'undefined'): ts.TypeNode {
     if (!notNull) {
         if (nullType === 'undefined') {
@@ -11,7 +26,9 @@ function nullableType(ctx: ts.TransformationContext, notNull: boolean, ori: ts.T
     return ori
 }
 
-export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQueryOutput, ep: string) => {
+
+
+export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQueryOutput, ep: string): ts.Statement[] => {
     const { factory } = ctx
     // Pick<pg.Client, "query">
     const connCompatible = factory.createTypeReferenceNode("Pick", [
@@ -32,89 +49,89 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
             eachinto[name] = typs.map(v => v.index)
         }
     }
-
-    // 
-    // export async function ${runEachQuery.name}(conn: ${connCompatible}, input: {...}):Promise<{...}[]>{$body}
-    return factory.createFunctionDeclaration(
-        [factory.createModifier(ts.SyntaxKind.ExportKeyword), factory.createModifier(ts.SyntaxKind.AsyncKeyword)], // export
-        undefined, // no asterisk(aka. generator syntax)
-        runEachQuery.name,
-        [],
-        [
-            // conn : Pick<pg.Client, "query">
-            factory.createParameterDeclaration([], undefined, 'conn', undefined, connCompatible, undefined),
-            // input : {...}
-            factory.createParameterDeclaration([], undefined, 'input', undefined,
-                factory.createTypeLiteralNode(
-                    runEachQuery.inputs.map(({ key, type }) => {
-                        return factory.createPropertySignature(undefined, key, factory.createToken(ts.SyntaxKind.QuestionToken), type)
-                    })
-                ),
-                undefined),
-        ],
-        factory.createTypeReferenceNode("Promise", [
-            factory.createArrayTypeNode(
-                factory.createTypeLiteralNode(
-                    Object.entries(fieldsGroupByName).map(([name, eaches]) => {
-                        if (eaches.length !== 1) {
-                            throw Error()
-                        }
-                        return factory.createPropertySignature(
-                            undefined,
-                            factory.createStringLiteral(name),
-                            undefined,
-                            nullableType(ctx, eaches[0].notNull ?? false, factory.createImportTypeNode(
-                                factory.createLiteralTypeNode(factory.createStringLiteral('qgen')),
-                                undefined,
-                                factory.createIdentifier("QgenTypeParser"),
-                                [
-                                    factory.createIndexedAccessTypeNode(
-                                        factory.createImportTypeNode(factory.createLiteralTypeNode(factory.createStringLiteral(ep)), undefined, undefined, undefined, true),
-                                        factory.createLiteralTypeNode(factory.createStringLiteral('default')),
-                                    ),
-                                    factory.createLiteralTypeNode(factory.createStringLiteral(eaches[0].type.namespace)),
-                                    factory.createLiteralTypeNode(factory.createStringLiteral(eaches[0].type.name)),
-                                ]
-                            )),
-                            // pgToTsTuple(eaches.map((v) => {
-                            //     return [v.type, v.notNull ?? false]
-                            // }), { pgNullToTs: 'null', mapping })(ctx)
-                        )
-                    })
+    // ====================================================================
+    const functionBlock: ts.Statement[] = []
+    // const result = await conn.query({ ... })
+    functionBlock.push(factory.createVariableStatement(undefined, factory.createVariableDeclarationList([
+        factory.createVariableDeclaration(
+            'result', undefined, undefined,
+            factory.createAwaitExpression(factory.createCallExpression(
+                factory.createPropertyAccessExpression(factory.createIdentifier('conn'), 'query'),
+                undefined,
+                [
+                    factory.createObjectLiteralExpression([
+                        factory.createPropertyAssignment('rowMode', factory.createStringLiteral("array")),
+                        factory.createPropertyAssignment('name', factory.createStringLiteral(runEachQuery.name)),
+                        factory.createPropertyAssignment('text', factory.createStringLiteral(runEachQuery.text)),
+                        // 입력값이 존재하는지 여부에 따라서 존재할수도 존재하지 않을 수 도 있는 ast
+                        ...(runEachQuery.inputs.length > 0 ? [
+                            factory.createPropertyAssignment('values', factory.createArrayLiteralExpression(
+                                runEachQuery.inputs.map(v => factory.createPropertyAccessExpression(factory.createIdentifier('input'), v.key))
+                            ))
+                        ] : []),
+                        //
+                        factory.createPropertyAssignment('types', factory.createIdentifier('_QGEN_EP')),
+                    ])
+                ]
+            ))
+        )
+    ], ts.NodeFlags.Const)))
+    switch (runEachQuery.mode) {
+        case "first":
+            // if(result.rowCount < 1) return undefined
+            functionBlock.push(factory.createIfStatement(
+                factory.createLessThan(helpIdentifier(factory, "result", "rowCount"), factory.createNumericLiteral(1)),
+                factory.createReturnStatement(factory.createIdentifier("undefined"))
+            ));
+            functionBlock.push(factory.createReturnStatement(factory.createObjectLiteralExpression(Object.entries(eachinto).map(([name, idx]) => {
+                return factory.createPropertyAssignment(
+                    factory.createStringLiteral(name),
+                    Array.isArray(idx)
+                        ? factory.createArrayLiteralExpression(idx.map((i) => helpIdentifier(factory, "result", "rows", i)))
+                        : helpIdentifier(factory, "result", "rows", 0, idx)
                 )
-            )
-        ]),
-        // $body : { ... }
-        factory.createBlock([
-            // const result = await conn.query({ ... })
-            factory.createVariableStatement(undefined, factory.createVariableDeclarationList([
-                factory.createVariableDeclaration(
-                    'result', undefined, undefined,
-                    factory.createAwaitExpression(factory.createCallExpression(
-                        factory.createPropertyAccessExpression(factory.createIdentifier('conn'), 'query'),
-                        undefined,
-                        [
-                            factory.createObjectLiteralExpression([
-                                factory.createPropertyAssignment('rowMode', factory.createStringLiteral("array")),
-                                factory.createPropertyAssignment('name', factory.createStringLiteral(runEachQuery.name)),
-                                factory.createPropertyAssignment('text', factory.createStringLiteral(runEachQuery.text)),
-                                factory.createPropertyAssignment('values', factory.createArrayLiteralExpression(
-                                    runEachQuery.inputs.map(v => factory.createPropertyAccessExpression(factory.createIdentifier('input'), v.key))
-                                )),
-                                factory.createPropertyAssignment('types', factory.createIdentifier('_QGEN_EP')),
-                            ])
-                        ]
-                    ))
+            }))))
+            break
+        case "option":
+            // if(result.rowCount > 1) throw Error("must be 0 or 1 row count")
+            functionBlock.push(factory.createIfStatement(
+                factory.createGreaterThan(helpIdentifier(factory, "result", "rowCount"), factory.createNumericLiteral(1)),
+                factory.createThrowStatement(factory.createCallExpression(factory.createIdentifier("Error"), undefined, [factory.createStringLiteral(`must be 0 or 1 row count`)]))
+            ));
+            // if(result.rowCount < 1) return undefined
+            functionBlock.push(factory.createIfStatement(
+                factory.createLessThan(helpIdentifier(factory, "result", "rowCount"), factory.createNumericLiteral(1)),
+                factory.createReturnStatement(factory.createIdentifier("undefined"))
+            ));
+            functionBlock.push(factory.createReturnStatement(factory.createObjectLiteralExpression(Object.entries(eachinto).map(([name, idx]) => {
+                return factory.createPropertyAssignment(
+                    factory.createStringLiteral(name),
+                    Array.isArray(idx)
+                        ? factory.createArrayLiteralExpression(idx.map((i) => helpIdentifier(factory, "result", "rows", i)))
+                        : helpIdentifier(factory, "result", "rows", 0, idx)
                 )
-            ], ts.NodeFlags.Const)),
+            }))))
+            break
+        case "void":
+            // return
+            functionBlock.push(factory.createReturnStatement())
+            break
+        default:
+            if (Number.isFinite(runEachQuery.mode)) {
+                // if(result.rowCount !== <mode>) throw Error("not expected row count <mode>")
+                functionBlock.push(factory.createIfStatement(
+                    factory.createStrictInequality(helpIdentifier(factory, "result", "rowCount"), factory.createNumericLiteral(runEachQuery.mode)),
+                    factory.createThrowStatement(factory.createCallExpression(factory.createIdentifier("Error"), undefined, [factory.createStringLiteral(`not expected row count ${runEachQuery.mode}`)]))
+                ));
+            }
             // const transformedRows: any = result.rows.map($1)
-            factory.createVariableStatement(undefined, factory.createVariableDeclarationList([
+            functionBlock.push(factory.createVariableStatement(undefined, factory.createVariableDeclarationList([
                 factory.createVariableDeclaration(
                     'transformedRows',
                     undefined,
                     factory.createToken(ts.SyntaxKind.AnyKeyword),
                     factory.createCallExpression(
-                        factory.createPropertyAccessExpression(factory.createPropertyAccessExpression(factory.createIdentifier('result'), 'rows'), 'map'),
+                        helpIdentifier(factory, "result", "rows", "map"),
                         undefined,
                         [
                             // $1 : (raw)=>{ ... }
@@ -129,18 +146,107 @@ export const eachQuery = (ctx: ts.TransformationContext, runEachQuery: RunEachQu
                                         return factory.createPropertyAssignment(
                                             factory.createStringLiteral(name),
                                             Array.isArray(idx)
-                                                ? factory.createArrayLiteralExpression(idx.map((i) => factory.createElementAccessExpression(factory.createIdentifier('raw'), i)))
-                                                : factory.createElementAccessExpression(factory.createIdentifier('raw'), idx)
+                                                ? factory.createArrayLiteralExpression(idx.map((i) => helpIdentifier(factory, "raw", i)))
+                                                : helpIdentifier(factory, "raw", idx)
                                         )
                                     })))
                                 ]),
                             ),
                         ]
                     ))
-            ], ts.NodeFlags.Const)),
+            ], ts.NodeFlags.Const)))
             // return transformedRows
-            factory.createReturnStatement(factory.createIdentifier('transformedRows'))
-        ], true),
-    )
+            functionBlock.push(factory.createReturnStatement(factory.createIdentifier('transformedRows')))
+            break
+    }
+    // ====================================================================
+    // export namespace <name> { ... }
+    const namespaceBlock: ts.Statement[] = []
+    if (runEachQuery.inputs.length > 0) {
+        // export interface Input { ... }
+        namespaceBlock.push(factory.createInterfaceDeclaration([factory.createModifier(ts.SyntaxKind.ExportKeyword)], 'Input', undefined, undefined,
+            runEachQuery.inputs.map(({ key, type }) => {
+                return factory.createPropertySignature(undefined, key, undefined, type)
+            })
+        ))
+    }
+
+    // export interface Output { ... }
+    namespaceBlock.push(factory.createInterfaceDeclaration([factory.createModifier(ts.SyntaxKind.ExportKeyword)], 'Output', undefined, undefined,
+        Object.entries(fieldsGroupByName).map(([name, eaches]) => {
+            if (eaches.length !== 1) {
+                throw Error(`이름이 같은 필드가 여러개인 경우`)
+            }
+            return factory.createPropertySignature(
+                undefined,
+                factory.createStringLiteral(name),
+                undefined,
+                nullableType(ctx, eaches[0].notNull ?? false, factory.createImportTypeNode(
+                    factory.createLiteralTypeNode(factory.createStringLiteral('qgen')),
+                    undefined,
+                    factory.createIdentifier("QgenTypeParser"),
+                    [
+                        factory.createIndexedAccessTypeNode(
+                            factory.createImportTypeNode(factory.createLiteralTypeNode(factory.createStringLiteral(ep)), undefined, undefined, undefined, true),
+                            factory.createLiteralTypeNode(factory.createStringLiteral('default')),
+                        ),
+                        factory.createLiteralTypeNode(factory.createStringLiteral(eaches[0].type.namespace)),
+                        factory.createLiteralTypeNode(factory.createStringLiteral(eaches[0].type.name)),
+                    ]
+                )),
+                // pgToTsTuple(eaches.map((v) => {
+                //     return [v.type, v.notNull ?? false]
+                // }), { pgNullToTs: 'null', mapping })(ctx)
+            )
+        })
+    ))
+    // 
+    const inputType = factory.createTypeReferenceNode(factory.createQualifiedName(factory.createIdentifier(runEachQuery.name), "Input"))
+    const outputTypeElem = () => factory.createTypeReferenceNode(factory.createQualifiedName(factory.createIdentifier(runEachQuery.name), "Output"))
+    let outputType: ts.TypeNode
+    switch (runEachQuery.mode) {
+        case "first":
+            outputType = factory.createUnionTypeNode([outputTypeElem(), factory.createToken(ts.SyntaxKind.UndefinedKeyword)])
+            break
+        case "option":
+            outputType = factory.createUnionTypeNode([outputTypeElem(), factory.createToken(ts.SyntaxKind.UndefinedKeyword)])
+            break
+        case "void":
+            outputType = factory.createToken(ts.SyntaxKind.VoidKeyword)
+            break
+        default:
+            if (Number.isFinite(runEachQuery.mode)) {
+                outputType = factory.createTypeReferenceNode("FixedArray", [factory.createTupleTypeNode(Array.from(Array(runEachQuery.mode)).map((v) => outputTypeElem()))])
+            } else {
+                outputType = factory.createTypeReferenceNode("Array", [outputTypeElem()])
+            }
+            break
+    }
+    // 
+    // export async function ${runEachQuery.name}(conn: ${connCompatible}, input: {...}):Promise<{...}[]>{$body}
+    return [
+        factory.createModuleDeclaration([factory.createModifier(ts.SyntaxKind.ExportKeyword)], factory.createIdentifier(runEachQuery.name), factory.createModuleBlock(namespaceBlock)),
+        factory.createFunctionDeclaration(
+            [factory.createModifier(ts.SyntaxKind.ExportKeyword), factory.createModifier(ts.SyntaxKind.AsyncKeyword)], // export
+            undefined, // no asterisk(aka. generator syntax)
+            runEachQuery.name,
+            [],
+            [
+                // conn : Pick<pg.Client, "query">
+                factory.createParameterDeclaration([], undefined, 'conn', undefined, connCompatible, undefined),
+                // 입력값 존재 여부에 따라서 존재하지 않을 수도 있는 ast 요소
+                // input : {...}
+                ...(
+                    runEachQuery.inputs.length > 0
+                        ? [factory.createParameterDeclaration([], undefined, 'input', undefined, inputType, undefined),]
+                        : []
+                )
+            ],
+            factory.createTypeReferenceNode("Promise", [outputType]),
+            // $body : { ... }
+            factory.createBlock(functionBlock, true),
+        ),
+
+    ]
 }
 
