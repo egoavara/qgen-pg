@@ -1,4 +1,4 @@
-import ts from "typescript"
+import { ExprType } from "./lang-expr-type.js"
 
 export interface StorageQuery {
     name: string
@@ -6,20 +6,7 @@ export interface StorageQuery {
     mode: "void" | "option" | "first" | number
     inputs: {
         key: string
-        type: ts.TypeNode
+        type: ExprType
         value: any
     }[]
 }
-
-// export namespace StorageQuery {
-//     let secret: StorageQuery[] = []
-//     export function push(val: StorageQuery) {
-//         secret.push(val)
-//     }
-//     export function clear() {
-//         secret = []
-//     }
-//     export function copy() {
-//         return Array.from(secret)
-//     }
-// }

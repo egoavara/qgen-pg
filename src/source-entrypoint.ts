@@ -1,92 +1,73 @@
 
-import ts from "typescript"
+import * as l from "./lang.js"
 import { ExtensionImport } from "./extension.js"
 import { PgType } from "./load-pgtype.js"
-import { PgToTsConfig, pgToTsParser, pgToTsType } from "./pg-to-ts.js"
+import { PgToTsConfig, pgToLangParser, pgToLangType } from "./pg-to-ts.js"
 import { RunPgTypeOutput } from "./program.js"
-
-const EntrypointHeader = `import { sqlfn, PrimitiveParser as PP, ArrayParser as AP, CompositeParser as CP } from "@egoavara/sqlfn";`
-export const createEntrypointSource = (filepath: string, pgtypes: RunPgTypeOutput, option: PgToTsConfig) => {
-    //
-    const groupNs: Record<string, Record<string, PgType>> = {}
-    const targetPgTypes: PgType[] = []
-    for (const ptyp of Object.values(pgtypes)) {
-        if (ptyp.namespace === 'pg_catalog' && ptyp.name.startsWith("pg_")) {
-            continue
-        }
-        if (['information_schema'].includes(ptyp.namespace)) {
-            continue
-        }
-        if (ptyp.type === 'class' && ptyp.relkind !== 'c') {
-            continue
-        }
-        if (ptyp.type === 'array' && ptyp.elem.type === 'class' && ptyp.elem.relkind !== 'c') {
-            continue
-        }
-        if (!(ptyp.namespace in groupNs)) {
-            groupNs[ptyp.namespace] = {}
-        }
-        groupNs[ptyp.namespace][ptyp.name] = ptyp
-        targetPgTypes.push(ptyp)
+export module EntrypointSource {
+    export const Header = () => {
+        return l.LangFile(
+            l.StatementImport(["sqlfn", ["PrimitiveParser", "PP"], ["ArrayParser", "AP"], ["CompositeParser", "CP"]], "@egoavara/sqlfn")
+        )
     }
-    //
-    const file = ts.createSourceFile(filepath, EntrypointHeader, ts.ScriptTarget.ESNext)
-    const trans = ts.transform(file, [({ factory }) => {
-        return (node) => {
-            // =====================================================================================================================
-            const typEachNamespace = Object.fromEntries(Object.entries(groupNs).map(([ns, nmmap]) => {
-                const nodeElem = Object.entries(nmmap).map(([nm, pgtyp]) => {
-                    return factory.createPropertySignature(undefined, factory.createStringLiteral(nm), undefined, pgToTsType(factory, pgtyp, true, option))
-                })
-                return [
-                    ns,
-                    factory.createTypeAliasDeclaration(undefined, `PgType_${ns}`, undefined, factory.createTypeLiteralNode(nodeElem)),
-                ]
-            }))
-            const typTotal = factory.createTypeAliasDeclaration(undefined, "PgType", undefined, factory.createTypeLiteralNode(Object.keys(typEachNamespace).map((ns) => {
-                return factory.createPropertySignature(undefined, factory.createStringLiteral(ns), undefined, factory.createTypeReferenceNode(`PgType_${ns}`))
-            })))
-            // =====================================================================================================================
-            const argElems = Object.values(targetPgTypes).map((pgtyp) => {
-                // oid, namespace, name, parser
-                return factory.createArrayLiteralExpression([
-                    factory.createNumericLiteral(pgtyp.oid),
-                    factory.createStringLiteral(pgtyp.namespace),
-                    factory.createStringLiteral(pgtyp.name),
-                    pgToTsParser(factory, pgtyp, true, option)
-                ])
-            })
-            const arg = factory.createArrayLiteralExpression(argElems)
-            const argdef = factory.createVariableStatement(undefined, factory.createVariableDeclarationList([
-                factory.createVariableDeclaration("PgParser", undefined, factory.createToken(ts.SyntaxKind.AnyKeyword), arg)
-            ], ts.NodeFlags.Const))
-            // =====================================================================================================================
-            return factory.updateSourceFile(
-                node,
-                [
-                    ...node.statements,
-                    // 
-                    ...(option.extension.map(v => { return ExtensionImport[v](factory) }).flat()),
-                    // 
-                    ...(Object.values(typEachNamespace)),
-                    typTotal,
-                    argdef,
-                    factory.createExportDefault(factory.createCallExpression(
-                        factory.createPropertyAccessExpression(
-                            factory.createCallExpression(factory.createIdentifier("sqlfn"), undefined, [factory.createStringLiteral("type")]),
-                            'setup'
-                        ),
-                        [
-                            factory.createTypeReferenceNode("PgType"),
-                        ],
-                        [
-                            factory.createIdentifier("PgParser")
-                        ]
-                    ))
-                ]
-            )
+    export const Source = (pgtypes: RunPgTypeOutput, option: PgToTsConfig) => {
+        const groupNs: Record<string, Record<string, PgType>> = {}
+        const targetPgTypes: PgType[] = []
+        for (const ptyp of Object.values(pgtypes)) {
+            if (ptyp.namespace === 'pg_catalog' && ptyp.name.startsWith("pg_")) {
+                continue
+            }
+            if (['information_schema'].includes(ptyp.namespace)) {
+                continue
+            }
+            if (ptyp.type === 'class' && ptyp.relkind !== 'c') {
+                continue
+            }
+            if (ptyp.type === 'array' && ptyp.elem.type === 'class' && ptyp.elem.relkind !== 'c') {
+                continue
+            }
+            if (!(ptyp.namespace in groupNs)) {
+                groupNs[ptyp.namespace] = {}
+            }
+            groupNs[ptyp.namespace][ptyp.name] = ptyp
+            targetPgTypes.push(ptyp)
         }
-    }])
-    return trans.transformed[0]
-
+        //
+        // =====================================================================================================================
+        const typEachNamespace = Object.fromEntries(Object.entries(groupNs).map(([ns, nmmap]) => {
+            return [ns, l.StatementInterface(["export"], `PgType_${ns}`, Object.entries(nmmap).map(([nm, pgtyp]) => {
+                return [nm, pgToLangType(pgtyp, true, option)]
+            }))]
+        }))
+        const typTotal = l.StatementInterface(["export"], "PgType", Object.keys(typEachNamespace).map((ns) => {
+            return [ns, l.ExprTypeAccess(`PgType_${ns}`)]
+        }))
+        // =====================================================================================================================
+        // ex) const PgParser = [[1, 'pg_catalog', 'bpchar', PP.noParse], ...]
+        const varParsers = l.StatementVariable(["export"], "const", "PgParser", l.ExprTypeKeyword("any"), l.ExprValueArray(Object.values(targetPgTypes).map((pgtyp) => {
+            // oid, namespace, name, parser
+            return l.ExprValueArray([
+                l.ExprValueLiteral(pgtyp.oid),
+                l.ExprValueLiteral(pgtyp.namespace),
+                l.ExprValueLiteral(pgtyp.name),
+                pgToLangParser(pgtyp, true, option),
+            ])
+        })));
+        // =====================================================================================================================
+        return l.LangFile(
+            Header(),
+            ...(option.extension.map(v => { return ExtensionImport[v]() }).flat()),
+            ...(Object.values(typEachNamespace)),
+            typTotal,
+            varParsers,
+            l.StatementExportDefault(
+                // sqlfn("type").setup<PgType>(PgParser)
+                l.ExprValueCall(
+                    // sqlfn("type").setup
+                    l.ExprValueIdentifier(l.ExprValueCall(l.ExprValueIdentifier("sqlfn"), [l.ExprValueLiteral("type")]), "setup"),
+                    [l.ExprTypeAccess("PgType"),], [l.ExprValueIdentifier("PgParser"),],
+                )
+            )
+        )
+    }
 }

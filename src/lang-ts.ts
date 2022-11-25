@@ -1,6 +1,6 @@
 import { ExprType } from "./lang-expr-type.js"
 import { ExprValue } from "./lang-expr-value.js"
-import { LangFile, DefineStatement, Statement, Block } from "./lang-stmt.js"
+import { Block, LangFile, Statement } from "./lang-stmt.js"
 
 export interface TypescriptFormat {
     depth?: number
@@ -119,6 +119,29 @@ export function fromStmtToTypescript(stmt: Statement, option?: TypescriptFormat)
             }
             temp.push(stmt.stmtof, stmt.name, "=", fromExprTypeToTypescript(stmt.type))
             break
+        case "export-default":
+            temp.push("export", "default", fromExprValueToTypescript(stmt.expr, nextOption(nnoption)))
+            break
+        case "import-type":
+            temp.push("import", "type")
+            if (stmt.name === undefined && stmt.fields.length === 0) {
+                temp.push(JSON.stringify(stmt.from))
+                break
+            }
+            temp.push([
+                ...(stmt.name !== undefined ? [stmt.name] : []),
+                ...(stmt.fields.length > 0 ? [
+                    `{ ${stmt.fields.map(v => {
+                        if (Array.isArray(v)) {
+                            return `${v[0]} as ${v[1]}`
+                        } else {
+                            return v
+                        }
+                    }).join(", ")} }`
+                ] : []),
+            ])
+            temp.push("from", JSON.stringify(stmt.from))
+            break
     }
     return indent + temp.map(v => {
         if (Array.isArray(v)) {
@@ -143,6 +166,7 @@ export function fromBlockToTypescript(block: Block<any>, option?: TypescriptForm
 }
 export function fromExprValueToTypescript(expr: ExprValue, option?: TypescriptFormat): string {
     const nnoption = requiredTypescriptFormat(option)
+    let result = ''
     switch (expr.valueof) {
         case "binary":
             return `${fromExprValueToTypescript(expr.left, nnoption)} ${expr.op} ${fromExprValueToTypescript(expr.right, nnoption)}`
@@ -154,13 +178,27 @@ export function fromExprValueToTypescript(expr: ExprValue, option?: TypescriptFo
                 default: return JSON.stringify(expr.value);
             }
         case "identifier":
-            return `${expr.ident[0]}` + expr.ident.slice(1).map(v => {
-                if (typeof v === 'number') {
-                    return `[${v}]`
-                } else {
-                    return `.${v}`
+            if (typeof expr.ident[0] === 'string') {
+                result += expr.ident[0]
+            } else {
+                result += fromExprValueToTypescript(expr.ident[0], nnoption)
+            }
+            for (const v of expr.ident.slice(1)) {
+                switch (typeof v) {
+                    case "number":
+                        result += `[${v}]`
+                        break
+                    case "string":
+                        result += `.${v}`
+                        break
+                    default:
+                        result += `[${fromExprValueToTypescript(v, nextOption(nnoption, { depthIncrease: false, ignoreDepth: true }))}]`
+                        break
                 }
-            }).join("")
+            }
+            return result
+        case "array":
+            return `[${expr.elems.map((v) => { return fromExprValueToTypescript(v, nnoption) }).join(", ")}]`
 
         case "object":
             return `{ ${expr.fields.map(([k, v]) => {
@@ -171,7 +209,12 @@ export function fromExprValueToTypescript(expr: ExprValue, option?: TypescriptFo
             }).join(", ")} }`
 
         case "call":
-            return `${fromExprValueToTypescript(expr.callee, nnoption)}(${expr.args.map(v => fromExprValueToTypescript(v, nnoption))})`
+            result += fromExprValueToTypescript(expr.callee, nnoption)
+            if (expr.typeArgs !== undefined) {
+                result += `<${expr.typeArgs.map(v => fromExprTypeToTypescript(v, nextOption(nnoption, { ignoreDepth: true }))).join(", ")}>`
+            }
+            result += `(${expr.args.map(v => fromExprValueToTypescript(v, nnoption))})`
+            return result
         case "await":
             return `await ${fromExprValueToTypescript(expr.value, nnoption)}`
         case "arrow-function":
@@ -191,11 +234,13 @@ export function fromExprValueToTypescript(expr: ExprValue, option?: TypescriptFo
                 body = fromBlockToTypescript(expr.value, nnoption).trimStart()
             } else {
                 body = fromExprValueToTypescript(expr.value, nnoption)
+                if (body.trim().startsWith("{")) {
+                    return `${param} => (${body})`
+                }
             }
             return `${param} => ${body}`
 
     }
-    console.log(expr)
     return "{} as any"
 }
 
@@ -210,7 +255,6 @@ export function fromExprTypeToTypescript(expr: ExprType, option?: TypescriptForm
         case "number": return "number";
         case "bigint": return "bigint";
         case "literal":
-            console.log("L", expr.value)
             switch (typeof expr.value) {
                 case "undefined": return "undefined";
                 case "object": return "null";
@@ -218,28 +262,41 @@ export function fromExprTypeToTypescript(expr: ExprType, option?: TypescriptForm
             }
             throw Error("unexpected")
         case "object":
-            return "{" +
-                expr.fields.map(([key, tp]) => {
-                    return `${JSON.stringify(key)}: ${fromExprTypeToTypescript(tp, nnoption)}`
-                }).join(", ") + "}"
+            return "{" + expr.fields.map(([key, tp]) => { return `${JSON.stringify(key)}: ${fromExprTypeToTypescript(tp, nnoption)}` }).join(", ") + "}"
         case "function":
             return `(${expr.params.map(([k, v]) => { return `${k}: ${fromExprTypeToTypescript(v, nnoption)}` }).join(", ")}) => ${fromExprTypeToTypescript(expr.returns, nnoption)}`
         case "reference":
+            const name = fromExprTypeToTypescript(expr.name, nnoption)
             if (expr.typeargs.length === 0) {
-                return expr.name
+                return name
             }
-            return `${expr.name}<${expr.typeargs.map(v => fromExprTypeToTypescript(v, nnoption)).join(", ")}>`
+            return `${name}<${expr.typeargs.map(v => fromExprTypeToTypescript(v, nnoption)).join(", ")}>`
         case "access":
-            return expr.args.map(v => {
+            let result = ''
+            // expr.args[0].toString()
+            if (typeof expr.args[0] === 'string') {
+                result += expr.args[0]
+            } else {
+                result += fromExprTypeToTypescript(expr.args[0], nnoption)
+            }
+            for (const v of expr.args.slice(1)) {
                 if (typeof v === "string") {
-                    return v
+                    result += '.' + v
+                } else {
+                    result += `[${fromExprTypeToTypescript(v, nnoption)}]`
                 }
-                return fromExprTypeToTypescript(v, nnoption)
-            }).join(".")
+            }
+            return result
         case "union":
             return expr.args.map(v => { return fromExprTypeToTypescript(v, nnoption) }).join(" | ")
         case "intersect":
             return expr.args.map(v => { return fromExprTypeToTypescript(v, nnoption) }).join(" & ")
+        case "import":
+            return `import(${JSON.stringify(expr.name)})`
+        case "typeof":
+            return `typeof ${fromExprTypeToTypescript(expr.about, nnoption)}`
+        case "tuple":
+            return `[${expr.elems.map(v => fromExprTypeToTypescript(v, nnoption))}]`
     }
     return "any"
 }

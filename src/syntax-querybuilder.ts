@@ -1,6 +1,5 @@
 import { StorageQuery } from "./storage-query.js"
-import ts from "typescript"
-import { QueryArgs } from "./index.js"
+import { ExprTypeKeyword } from "./lang.js"
 
 export class QueryBuilder {
     static RE_NAMED_ARGS = /\{\{\s*([a-zA-Z_-][a-zA-Z0-9_-]*)\s*\}\}/g
@@ -49,7 +48,7 @@ export class QueryBuilder {
             this.ref.inputs.push({
                 key: field[1],
                 value: null,
-                type: ts.factory.createToken(ts.SyntaxKind.AnyKeyword)
+                type: ExprTypeKeyword("any")
             })
             qStartAt = field.index! + field[0].length
         }

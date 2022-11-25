@@ -1,7 +1,7 @@
 import { ExprType } from "./lang-expr-type.js"
 import { Block, RunnableStatement } from "./lang-stmt.js"
 
-export type ExprValue = ExprValueLiteral | ExprValueObject | ExprValueIdentifier | ExprValueCall | ExprValueAwait | ExprValueArrowFunction | ExprValueBinaryOp
+export type ExprValue = ExprValueLiteral | ExprValueArray | ExprValueObject | ExprValueIdentifier | ExprValueCall | ExprValueAwait | ExprValueArrowFunction | ExprValueBinaryOp
 
 export interface ExprValueLiteral {
     kindof: "expression"
@@ -11,6 +11,14 @@ export interface ExprValueLiteral {
 export function ExprValueLiteral(value: string | boolean | null | undefined | number | bigint): ExprValueLiteral { return { kindof: "expression", valueof: "literal", value } }
 
 
+export interface ExprValueArray {
+    kindof: "expression"
+    valueof: 'array'
+    elems: ExprValue[]
+}
+export function ExprValueArray(elems: ExprValue[]): ExprValueArray {
+    return { kindof: "expression", valueof: "array", elems }
+}
 
 export interface ExprValueObject {
     kindof: "expression"
@@ -24,18 +32,26 @@ export function ExprValueObject(fields: [string | ExprValue, ExprValue][]): Expr
 export interface ExprValueIdentifier {
     kindof: "expression"
     valueof: 'identifier'
-    ident: [string, ...(string | number)[]]
+    ident: [string | ExprValue, ...(ExprValue | string | number)[]]
 }
-export function ExprValueIdentifier(ident: string, ...elseIdents: (string | number)[]): ExprValueIdentifier { return { kindof: "expression", valueof: "identifier", ident: [ident, ...elseIdents] } }
+export function ExprValueIdentifier(ident: string | ExprValue, ...elseIdents: (ExprValue | string | number)[]): ExprValueIdentifier { return { kindof: "expression", valueof: "identifier", ident: [ident, ...elseIdents] } }
 
 
 export interface ExprValueCall {
     kindof: "expression"
     valueof: 'call'
     callee: ExprValue
+    typeArgs?: ExprType[]
     args: ExprValue[]
 }
-export function ExprValueCall(callee: ExprValue, args?: ExprValue[]): ExprValueCall { return { kindof: "expression", valueof: "call", callee, args: args ?? [] } }
+export function ExprValueCall(callee: ExprValue, typeArgs: ExprType[], args: ExprValue[]): ExprValueCall;
+export function ExprValueCall(callee: ExprValue, args: ExprValue[]): ExprValueCall;
+export function ExprValueCall(...args: any[]): ExprValueCall {
+    if (args.length === 3) {
+        return { kindof: "expression", valueof: "call", callee: args[0], typeArgs: args[1], args: args[2] }
+    }
+    return { kindof: "expression", valueof: "call", callee: args[0], args: args[1] }
+}
 
 export interface ExprValueAwait {
     kindof: "expression"

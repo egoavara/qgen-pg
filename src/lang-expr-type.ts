@@ -1,4 +1,4 @@
-export type ExprType = ExprTypeKeyword | ExprTypeLiteral | ExprTypeObject | ExprTypeFunction | ExprTypeReference | ExprTypeUnion | ExprTypeAccess | ExprTypeIntersect
+export type ExprType = ExprTypeKeyword | ExprTypeLiteral | ExprTypeObject | ExprTypeFunction | ExprTypeReference | ExprTypeUnion | ExprTypeAccess | ExprTypeIntersect | ExprTypeImport | ExprTypeTypeof | ExprTypeTuple
 
 export interface ExprTypeKeyword {
     kindof: "expression"
@@ -32,9 +32,9 @@ export interface ExprTypeReference {
     kindof: "expression"
     typeof: 'reference',
     typeargs: ExprType[]
-    name: string
+    name: ExprType
 }
-export function ExprTypeReference(name: string, typeargs: ExprType[]): ExprTypeReference { return { kindof: "expression", typeof: 'reference', name, typeargs } }
+export function ExprTypeReference(name: ExprType, typeargs: ExprType[]): ExprTypeReference { return { kindof: "expression", typeof: 'reference', name, typeargs } }
 
 export interface ExprTypeUnion {
     kindof: "expression"
@@ -57,3 +57,26 @@ export interface ExprTypeIntersect {
     args: ExprType[]
 }
 export function ExprTypeIntersect(...args: (ExprType)[]): ExprTypeIntersect { return { kindof: "expression", typeof: 'intersect', args } }
+
+export interface ExprTypeImport {
+    kindof: "expression"
+    typeof: 'import',
+    name: string,
+
+}
+export function ExprTypeImport(name: string,): ExprTypeImport { return { kindof: "expression", typeof: 'import', name } }
+export interface ExprTypeTypeof {
+    kindof: "expression"
+    typeof: 'typeof',
+    about: ExprType
+
+}
+export function ExprTypeTypeof(about: ExprType): ExprTypeTypeof { return { kindof: "expression", typeof: 'typeof', about } }
+
+export interface ExprTypeTuple {
+    kindof: "expression"
+    typeof: 'tuple',
+    elems: ExprType[]
+
+}
+export function ExprTypeTuple(...elems: ExprType[]): ExprTypeTuple { return { kindof: "expression", typeof: 'tuple', elems } }

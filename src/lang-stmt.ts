@@ -17,7 +17,7 @@ export function LangFile(...stmtOrFiles: (LangFile | DefineStatement)[]): LangFi
 }
 
 export type Statement = DefineStatement | RunnableStatement
-export type DefineStatement = StatementVariable | StatementType | StatementFunction | StatementImport | StatementModule | StatementInterface
+export type DefineStatement = StatementVariable | StatementType | StatementFunction | StatementImport | StatementModule | StatementInterface | StatementExportDefault | StatementImportType
 export type RunnableStatement = StatementVariable | StatementType | StatementFunction | StatementReturn | StatementExpression | StatementIf | StatementThrow
 
 export interface _StatementKind {
@@ -47,6 +47,29 @@ export function StatementImport(...args: any[]): StatementImport {
         return { kindof: "statement", stmtof: "import", name: args[0], fields: [], from: args[1] }
     }
     return { kindof: "statement", stmtof: "import", fields: [], from: args[0] }
+}
+
+export interface StatementImportType extends _StatementKind {
+    stmtof: 'import-type'
+    name?: string
+    fields: (string | [string, string])[]
+    from: string
+}
+export function StatementImportType(from: string): StatementImportType;
+export function StatementImportType(name: string, from: string): StatementImportType;
+export function StatementImportType(fields: (string | [string, string])[], from: string): StatementImportType;
+export function StatementImportType(name: string, fields: (string | [string, string])[], from: string): StatementImportType;
+export function StatementImportType(...args: any[]): StatementImportType {
+    if (args.length === 3) {
+        return { kindof: "statement", stmtof: "import-type", name: args[0], fields: args[1], from: args[2] }
+    }
+    if (args.length === 2 && Array.isArray(args[0])) {
+        return { kindof: "statement", stmtof: "import-type", fields: args[0], from: args[1] }
+    }
+    if (args.length === 2 && typeof args[0] === 'string') {
+        return { kindof: "statement", stmtof: "import-type", name: args[0], fields: [], from: args[1] }
+    }
+    return { kindof: "statement", stmtof: "import-type", fields: [], from: args[0] }
 }
 
 export interface StatementVariable extends _StatementKind, _StatementModifier {
@@ -184,12 +207,20 @@ export function StatementIf(condition: ExprValue, block: Block<RunnableStatement
     return { kindof: "statement", stmtof: "if", condition, block }
 }
 
+export interface StatementExportDefault extends _StatementKind {
+    stmtof: 'export-default'
+    expr: ExprValue
+}
+export function StatementExportDefault(expr: ExprValue): StatementExportDefault {
+    return { kindof: "statement", stmtof: "export-default", expr }
+}
+
 
 export interface Block<S extends Statement> {
     kindof: "block",
     statements: S[]
 }
-export function Block(...statements: Statement[]): Block<Statement>;
+export function Block<T extends RunnableStatement | DefineStatement>(...statements: T[]): Block<T>;
 export function Block(mode: "run", ...statements: RunnableStatement[]): Block<RunnableStatement>;
 export function Block(mode: "define", ...statements: DefineStatement[]): Block<DefineStatement>;
 export function Block(...args: any[]): Block<any> {

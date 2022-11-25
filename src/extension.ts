@@ -1,62 +1,61 @@
-import { } from "bignumber.js"
-import ts, { factory } from "typescript"
+import * as l from "./lang.js"
 import { pgBuiltins } from "./pg-builtins.js"
 import { Define } from "./pg-to-ts.js"
 export type Extension = ("bigint" | "bignumber.js" | "moment" | "currency.js")
-export const ExtensionImport: Record<Extension, (f: ts.NodeFactory) => ts.Statement[]> = {
-    "bigint": (f) => [],
-    "bignumber.js": (f) => [f.createImportDeclaration(undefined, f.createImportClause(false, undefined, f.createNamedImports([f.createImportSpecifier(false, undefined, f.createIdentifier('BigNumber'))])), f.createStringLiteral("bignumber.js"))],
-    "moment": (f) => [f.createImportDeclaration(undefined, f.createImportClause(false, f.createIdentifier("moment"), f.createNamedImports([
-        f.createImportSpecifier(false, undefined, f.createIdentifier('Moment')),
-        f.createImportSpecifier(false, undefined, f.createIdentifier('Duration')),
-    ])), f.createStringLiteral("moment"))],
-    "currency.js": (f) => [f.createImportDeclaration(undefined, f.createImportClause(false, f.createIdentifier("currency"), undefined), f.createStringLiteral("currency.js")),],
+export const ExtensionImport: Record<Extension, () => l.DefineStatement[]> = {
+    "bigint": () => [],
+    "bignumber.js": () => ([l.StatementImport(["BigNumber"], "bignumber.js")]),
+    "moment": () => ([l.StatementImport("moment", ["Moment", "Duration"], "moment")]),
+    "currency.js": () => ([l.StatementImport("currency", "currency.js")]),
 }
 export const ExtensionDefine: Record<Extension, Define> = {
     "bigint": {
-        [pgBuiltins.int8]: { type: (f) => f.createKeywordTypeNode(ts.SyntaxKind.BigIntKeyword), parser: (f) => f.createPropertyAccessExpression(f.createIdentifier("PP"), "parseBigInteger") }
+        [pgBuiltins.int8]: { type: () => l.ExprTypeKeyword("bigint"), parser: () => l.ExprValueIdentifier("PP", "parseBigInteger") }
     },
     "bignumber.js": {
-        [pgBuiltins.numeric]: { type: (f) => f.createTypeReferenceNode("BigNumber"), parser: (f) => f.createIdentifier("BigNumber") }
+        [pgBuiltins.numeric]: { type: () => l.ExprTypeAccess("BigNumber"), parser: () => l.ExprValueIdentifier("BigNumber") }
     },
     "moment": {
         [pgBuiltins.date]: {
-            type: (f) => f.createTypeReferenceNode("Moment"),
-            parser: (f) => f.createArrowFunction(undefined, undefined, [f.createParameterDeclaration(undefined, undefined, 'raw')], undefined,
-                f.createToken(ts.SyntaxKind.EqualsGreaterThanToken), f.createCallExpression(f.createIdentifier("moment"), undefined, [f.createIdentifier("raw"), f.createStringLiteral("YYYY-MM-DD")])
+            type: () => l.ExprTypeAccess("Moment"),
+            parser: () => l.ExprValueArrowFunction(
+                [["raw", l.ExprTypeKeyword("string")]],
+                l.ExprValueCall(l.ExprValueIdentifier("moment"), [l.ExprValueIdentifier("raw"), l.ExprValueLiteral("YYYY-MM-DD")]),
             )
         },
         [pgBuiltins.timestamp]: {
-            type: (f) => f.createTypeReferenceNode("Moment"),
-            parser: (f) => f.createArrowFunction(undefined, undefined, [f.createParameterDeclaration(undefined, undefined, 'raw')], undefined,
-                f.createToken(ts.SyntaxKind.EqualsGreaterThanToken), f.createCallExpression(f.createIdentifier("moment"), undefined, [f.createIdentifier("raw"), f.createStringLiteral("YYYY-MM-DD hh:mm:ss")])
+            type: () => l.ExprTypeAccess("Moment"),
+            parser: () => l.ExprValueArrowFunction(
+                [["raw", l.ExprTypeKeyword("string")]],
+                l.ExprValueCall(l.ExprValueIdentifier("moment"), [l.ExprValueIdentifier("raw"), l.ExprValueLiteral("YYYY-MM-DD hh:mm:ss")]),
             )
         },
         [pgBuiltins.timestamptz]: {
-            type: (f) => f.createTypeReferenceNode("Moment"),
-            parser: (f) => f.createArrowFunction(undefined, undefined, [f.createParameterDeclaration(undefined, undefined, 'raw')], undefined,
-                f.createToken(ts.SyntaxKind.EqualsGreaterThanToken), f.createCallExpression(f.createIdentifier("moment"), undefined, [f.createIdentifier("raw"), f.createStringLiteral("YYYY-MM-DD hh:mm:ssZ")])
+            type: () => l.ExprTypeAccess("Moment"),
+            parser: () => l.ExprValueArrowFunction(
+                [["raw", l.ExprTypeKeyword("string")]],
+                l.ExprValueCall(l.ExprValueIdentifier("moment"), [l.ExprValueIdentifier("raw"), l.ExprValueLiteral("YYYY-MM-DD hh:mm:ssZ")]),
             )
         },
         [pgBuiltins.time]: {
-            type: (f) => f.createTypeReferenceNode("Moment"),
-            parser: (f) => f.createArrowFunction(undefined, undefined, [f.createParameterDeclaration(undefined, undefined, 'raw')], undefined,
-                f.createToken(ts.SyntaxKind.EqualsGreaterThanToken), f.createCallExpression(f.createIdentifier("moment"), undefined, [f.createIdentifier("raw"), f.createStringLiteral("hh:mm:ss")])
+            type: () => l.ExprTypeAccess("Moment"),
+            parser: () => l.ExprValueArrowFunction(
+                [["raw", l.ExprTypeKeyword("string")]],
+                l.ExprValueCall(l.ExprValueIdentifier("moment"), [l.ExprValueIdentifier("raw"), l.ExprValueLiteral("hh:mm:ss")]),
             )
         },
         [pgBuiltins.timetz]: {
-            type: (f) => f.createTypeReferenceNode("Moment"),
-            parser: (f) => f.createArrowFunction(undefined, undefined, [f.createParameterDeclaration(undefined, undefined, 'raw')], undefined,
-                f.createToken(ts.SyntaxKind.EqualsGreaterThanToken), f.createCallExpression(f.createIdentifier("moment"), undefined, [f.createIdentifier("raw"), f.createStringLiteral("hh:mm:ssZ")])
+            type: () => l.ExprTypeAccess("Moment"),
+            parser: () => l.ExprValueArrowFunction(
+                [["raw", l.ExprTypeKeyword("string")]],
+                l.ExprValueCall(l.ExprValueIdentifier("moment"), [l.ExprValueIdentifier("raw"), l.ExprValueLiteral("hh:mm:ssZ")]),
             )
         },
     },
     "currency.js": {
         [pgBuiltins.money]: {
-            type: (f) => f.createTypeReferenceNode("currency"),
-            parser: (f) => f.createArrowFunction(undefined, undefined, [f.createParameterDeclaration(undefined, undefined, 'raw', undefined, f.createToken(ts.SyntaxKind.StringKeyword))], undefined,
-                f.createToken(ts.SyntaxKind.EqualsGreaterThanToken), f.createCallExpression(f.createIdentifier("currency"), undefined, [f.createIdentifier("raw")])
-            )
+            type: () => l.ExprTypeAccess("currency"),
+            parser: () => l.ExprValueArrowFunction([["raw", l.ExprTypeKeyword("string")]], l.ExprValueCall(l.ExprValueIdentifier("currency"), [l.ExprValueIdentifier("raw")]))
         }
     },
 }

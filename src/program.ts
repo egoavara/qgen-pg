@@ -6,11 +6,12 @@ import ts from "typescript"
 import vm from "vm"
 import { QueryError } from "./errors.js"
 import { ExtensionDefine } from "./extension.js"
+import { LangFile } from "./lang-stmt.js"
+import { fromFileToTypescript } from "./lang-ts.js"
 import { loadPgtableAllPgtypeOids, loadPgtypeAllOids, loadPgtypeByOid, PgType, PgTypeClass } from "./load-pgtype.js"
-import { defaultDefines, PgToTsConfig } from "./pg-to-ts.js"
-import { eachQuery } from "./source-eachquery.js"
-import { createEntrypointSource } from "./source-entrypoint.js"
-import { QueryHeader } from "./source-query.js"
+import { knownDefines, PgToTsConfig } from "./pg-to-ts.js"
+import { QuerySource } from "./source-eachquery.js"
+import { EntrypointSource } from "./source-entrypoint.js"
 import { StorageQuery } from "./storage-query.js"
 import { QueryBuilder } from "./syntax-querybuilder.js"
 import { snakeToCamel } from "./utils.js"
@@ -150,14 +151,6 @@ export class Program {
                     reject(result.diagnostics)
                 }
             })
-            // ((path) => {
-            //     console.log("PROGRAM : ", path)
-            //     if (path === '$$__SQLFN__$$') {
-            //         return result
-            //     }
-            //     require.resolve
-            //     return require(path)
-            // })
             const sandbox = vm.createContext({
                 exports: {},
                 require: require,
@@ -252,29 +245,19 @@ export class Program {
             const tempep = path.posix.relative(path.posix.dirname(outputFileName), entrypointjs)
             const relep = tempep.startsWith(".") ? tempep : "./" + tempep
             // output
-            const tsrc = ts.transform(
-                ts.createSourceFile(outputFileName, QueryHeader(relep), ts.ScriptTarget.ESNext),
-                [
-                    (ctx) => {
-                        return (node) => {
-
-                            return ctx.factory.updateSourceFile(
-                                node,
-                                [
-                                    ...node.statements,
-                                    ...output.query.map((val) => {
-                                        return eachQuery(ctx, val, relep)
-                                    }).flat()
-                                ]
-                            )
-                        }
-                    }
-                ]
-            ).transformed[0]
+            const tsrc = LangFile(
+                QuerySource.Header(relep),
+                ...output.query.map((val) => {
+                    return [
+                        QuerySource.Define(relep, val),
+                        QuerySource.Implement(val),
+                    ]
+                }).flat(),
+            )
 
             return [
                 outputFileName,
-                this.printer.printFile(tsrc),
+                fromFileToTypescript(tsrc),
             ]
         })))
         // 
@@ -287,11 +270,12 @@ export class Program {
             arrayElem: this.option.config.arrayElem ?? "null",
             extension: this.option.config.extension ?? [],
             mapping: typesOutput,
-            define: Object.create(defaultDefines),
+            define: Object.create(knownDefines),
         }
         Object.assign(option.define, ...option.extension.map(ext => ExtensionDefine[ext]))
+
         return {
-            [path.posix.relative(this.option.cwd, entrypoint)]: this.printer.printFile(createEntrypointSource(this.option.entrypoint, typesOutput, option))
+            [path.posix.relative(this.option.cwd, entrypoint)]: fromFileToTypescript(EntrypointSource.Source(typesOutput, option))
         }
     }
     //
